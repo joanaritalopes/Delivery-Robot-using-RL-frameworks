@@ -3,6 +3,7 @@ Environment.
 """
 import random
 import numpy as np
+from pyparsing import col
 from tqdm import trange
 from pathlib import Path
 from warnings import warn
@@ -17,13 +18,14 @@ from world.path_visualizer import visualize_path
 
 class Environment:
     def __init__(self,
-                 grid_fp: Path,
-                 no_gui: bool = False,
-                 sigma: float = 0.,
-                 agent_start_pos: tuple[int, int] = None,
-                 reward_fn: callable = None,
-                 target_fps: int = 30,
-                 random_seed: int | float | str | bytes | bytearray | None = 0):
+                grid_fp: Path,
+                no_gui: bool = False,
+                sigma: float = 0.,
+                agent_start_pos: tuple[int, int] = None,
+                reward_fn: callable = None,
+                target_fps: int = 30,
+                random_seed: int | float | str | bytes | bytearray | None = 0,
+                normalize_state: bool = True):
         
         """Creates the Grid Environment for the Reinforcement Learning robot
         from the provided file.
@@ -47,6 +49,8 @@ class Environment:
                 happening. Set to 0 or less to unlock FPS.
             random_seed: The random seed to use for this environment. If None
                 is provided, then the seed will be set to 0.
+            normalize_state: Whether to normalize the state representation to
+                be between 0 and 1.
         """
         random.seed(random_seed)
 
@@ -60,7 +64,8 @@ class Environment:
         self.agent_start_pos = agent_start_pos
         self.terminal_state = False
         self.sigma = sigma
-              
+        self.normalize_state = normalize_state
+
         # Set up reward function
         if reward_fn is None:
             warn("No reward function provided. Using default reward.")
@@ -189,7 +194,7 @@ class Environment:
                   f"--start_pos {self.agent_pos[0]},{self.agent_pos[1]}")
 
 
-    def reset(self, **kwargs) -> tuple[int, int]:
+    def reset(self, **kwargs) -> np.ndarray:
         """Reset the environment to an initial state.
 
         You can fit it keyword arguments which will overwrite the 
@@ -235,7 +240,7 @@ class Environment:
 
         self._initialize_agent_pos()
 
-        return self.agent_pos
+        return self._get_state()
 
     def _move_agent(self, new_pos: tuple[int, int]):
         """Moves the agent, if possible and updates the 
@@ -270,7 +275,7 @@ class Environment:
                                  f"{new_pos}.")
         
 
-    def step(self, action: int) -> tuple[np.ndarray, float, bool]:
+    def step(self, action: int) -> tuple[np.ndarray, float, bool, dict]:
         """This function makes the agent take a step on the grid.
 
         Action is provided as integer and values are:
@@ -286,6 +291,7 @@ class Environment:
             0) Current state,
             1) The reward for the agent,
             2) If the terminal state has been reached, and
+            3) Additional information about the environment.
         """
         
         self.world_stats["total_steps"] += 1
@@ -333,7 +339,7 @@ class Environment:
             self.gui.render(self.grid, self.agent_pos, self.info,
                             reward, is_single_step)
 
-        return self.agent_pos, reward, self.terminal_state, self.info
+        return self._get_state(), reward, self.terminal_state, self.info
 
     @staticmethod
     def _default_reward_function(grid, agent_pos) -> float:
@@ -412,7 +418,7 @@ class Environment:
             action = agent.take_action(state)
             state, _, terminated, _ = env.step(action)
 
-            agent_path.append(state)
+            agent_path.append(env.agent_pos)
 
             if terminated:
                 break
@@ -423,3 +429,13 @@ class Environment:
         file_name = datetime.now().strftime("%Y-%m-%d__%H-%M-%S")
 
         save_results(file_name, env.world_stats, path_image, show_images)
+    
+    def _get_state(self) -> np.ndarray:
+        row, col = self.agent_pos
+
+        if self.normalize_state:
+            max_row = max(1, self.grid.shape[0] - 1)
+            max_col = max(1, self.grid.shape[1] - 1)
+            return np.array([row / max_row, col / max_col], dtype=np.float32)
+
+        return np.array([float(row), float(col)], dtype=np.float32)

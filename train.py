@@ -47,21 +47,21 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
         agent = RandomAgent()
         
         # Always reset the environment to initial state
-        initial_pos = env.reset()
-        state = initial_pos
+        state = env.reset()
+        initial_pos = env.agent_pos
         for _ in trange(iters):
             
             # Agent takes an action based on the latest observation and info.
             action = agent.take_action(state)
 
             # The action is performed in the environment
-            state, reward, terminated, info = env.step(action)
+            next_state, reward, terminated, info = env.step(action)
+            agent.update(next_state, reward, info["actual_action"])
+            state = next_state
             
             # If the final state is reached, stop.
             if terminated:
                 break
-
-            agent.update(state, reward, info["actual_action"])
 
         # Evaluate the agent
         Environment.evaluate_agent(grid, agent, iters, sigma,

@@ -3,7 +3,7 @@
 We define the base class for all agents in this file.
 """
 from abc import ABC, abstractmethod
-
+import numpy as np
 
 class BaseAgent(ABC):
     def __init__(self):
@@ -14,7 +14,7 @@ class BaseAgent(ABC):
         """
 
     @abstractmethod
-    def take_action(self, state: tuple[int, int]) -> int:
+    def take_action(self, state: np.ndarray) -> int:
         """Any code that does the action should be included here.
 
         Args:
@@ -23,7 +23,7 @@ class BaseAgent(ABC):
         raise NotImplementedError
     
     @abstractmethod
-    def update(self, state: tuple[int, int], reward: float, action: int):
+    def update(self, state: np.ndarray, reward: float, action: int):
         """Any code that processes a reward given the state and updates the agent.
 
         Args:
