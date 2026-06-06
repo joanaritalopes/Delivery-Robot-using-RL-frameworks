@@ -1,6 +1,7 @@
 """Deep Q Network (DQN) Agent"""
-from collections import namedtuple
+from collections import namedtuple, deque
 from agents import BaseAgent
+import random
 import numpy as np
 import torch
 import torch.nn as nn
@@ -46,8 +47,8 @@ class DQN(BaseAgent):
         ep_decay: float = 0.9995,           # 0.995, 0.9995, 0.99995
         min_ep: float = 0.01,               # 0.01, 0.05
         batch_size: int = 64,               # 32, 64, 128
-        min_buffer: int = 1000,             # 1 000, 5 000
-        max_buffer: int = 5000,             # 10 000, 100 000
+        min_buffer: int = 1000,             # 1 000, 2 000, 5 000
+        max_buffer: int = 5000,             # 10 000, 50 000, 100 000
         target_update_interval: int = 200,  # 100, 200, 1000
         seed: int | None = None,
         input_dim: int = 2,
@@ -75,20 +76,22 @@ class DQN(BaseAgent):
         self.min_ep = min_ep
         self.batch_size = batch_size
         self.min_buffer = min_buffer
-        self.max_buffer = max_buffer
         self.target_update_interval = target_update_interval
 
         # Fixed parameters
         self.rng = np.random.default_rng(seed)
+        random.seed(seed)
+        if seed is not None:
+            torch.manual_seed(seed)
         self.input_dim = input_dim
         self.output_dim = output_dim
 
         # Internal parameters
-        self.last_state: torch.tensor | None = None
-        self.last_action: int | None = None
+        self.state: np.ndarray | None = None
+        self.action: int | None = None
         self.update_counter = 0
         self.Experience = namedtuple("Experience", ["state", "action", "reward", "next_state", "terminated"])
-        self.replay_buffer = []
+        self.replay_buffer = deque(maxlen=max_buffer)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.online_network = NeuralNetworkDQN(input_dim, output_dim).to(self.device)
         self.target_network = NeuralNetworkDQN(input_dim, output_dim).to(self.device)
@@ -99,52 +102,54 @@ class DQN(BaseAgent):
 
     def update(
         self,
-        state: np.ndarray,
+        next_state: np.ndarray,
         reward: float,
-        action: int | None = None,
+        a: int | None = None,
         terminated: bool = False,
     ):
         """
         Build experiences, update the replay buffer, update the online and target networks.
 
         Args:
-            state: New state after taking the previous action.
+            next_state: New state after taking the previous action.
             reward: Reward received.
-            action: Kept for compatibility with BaseAgent, but this implementation
-                uses self.last_action because that is the action chosen by the agent.
+            a: Action (a) was kept for compatibility with BaseAgent, but this implementation
+                uses self.action because that is the action chosen by the agent.
             terminated: Whether the new state is terminal.
         """
         # Prevent the first step from crashing
-        if self.last_state is None or self.last_action is None:
+        if self.state is None or self.action is None:
             return
 
         # Build experiences (state, action, Reward(next_state), next_state, terminated)
-        next_x, next_y = state
-        next_state = torch.tensor([next_x, next_y], dtype=torch.float32)
-        experience = self.Experience(self.last_state, self.last_action, reward, next_state, terminated)
+        experience = self.Experience(self.state.copy(), self.action, reward, next_state.copy(), terminated)
 
         # Update replay buffer
         self.replay_buffer.append(experience)
-        if len(self.replay_buffer) > self.max_buffer:
-            self.replay_buffer.pop(0)
 
-        # Choose random experience from buffer
+        # Clear history if terminated
+        if terminated:
+            self.state = None
+            self.action = None
+
+        # Run if buffer is large enough
         if len(self.replay_buffer) > self.min_buffer:
             # Get mini batch
-            indices = self.rng.choice(len(self.replay_buffer), size=self.batch_size, replace=False)
-            batch = self.Experience(*zip(*[self.replay_buffer[i] for i in indices]))
+            samples = random.sample(self.replay_buffer, self.batch_size)
+            batch = self.Experience(*zip(*samples))
 
             # Get mini batch variables
-            states = torch.stack(batch.state).to(self.device)
+            states = torch.tensor(batch.state, dtype=torch.float32).to(self.device)
             actions = torch.tensor(batch.action, dtype=torch.long).to(self.device)
             rewards = torch.tensor(batch.reward, dtype=torch.float32).to(self.device)
-            next_states = torch.stack(batch.next_state).to(self.device)
+            next_states = torch.tensor(batch.next_state, dtype=torch.float32).to(self.device)
             terminations = torch.tensor(batch.terminated, dtype=torch.bool).to(self.device)
 
             # Calculate MSE-loss
             q_values = self.online_network(states).gather(1, actions.unsqueeze(1)).squeeze(1)
-            next_q_values = self.target_network(next_states).max(dim=1).values
-            y = rewards + self.df*(torch.logical_not(terminations))*next_q_values
+            with torch.no_grad():
+                next_q_values = self.target_network(next_states).max(dim=1).values
+                y = rewards + self.df*(torch.logical_not(terminations))*next_q_values
             mse_loss = self.loss_fn(q_values, y)
 
             # Backward pass (update online network)
@@ -153,13 +158,10 @@ class DQN(BaseAgent):
             self.optimizer.step()
 
             # Scheduled target network update
+            self.update_counter += 1
             if self.update_counter >= self.target_update_interval:
                 self.target_network.load_state_dict(self.online_network.state_dict())
-                for param in self.target_network.parameters():
-                    param.requires_grad = False
                 self.update_counter = 0
-            else:
-                self.update_counter += 1
 
             # Decay exploration after learning
             self.ep = max(self.min_ep, self.ep*self.ep_decay)
@@ -174,19 +176,19 @@ class DQN(BaseAgent):
             2: left
             3: right
         """
-        # Convert state to tensor
-        state = torch.tensor(state, dtype=torch.float32)
+        # Update state
+        self.state = state
 
         # Take random or best action
         if self.rng.random() < self.ep:
-            action = int(self.rng.integers(0, 4))
+            action = int(self.rng.integers(0, self.output_dim))
         else:
             with torch.no_grad():
-                action = int((self.online_network(state)).argmax())
+                s = torch.tensor(state, dtype=torch.float32).to(self.device)
+                action = int((self.online_network(s)).argmax())
 
-        # Update variables
-        self.last_state = state
-        self.last_action = action
+        # Update action
+        self.action = action
         return action
 
 
