@@ -8,6 +8,7 @@ from tqdm import trange
 
 from world import Environment
 from agents.random_agent import RandomAgent
+from agents.dqn_agent import DQN
 
 def parse_args():
     p = ArgumentParser(description="DIC Reinforcement Learning Trainer.")
@@ -44,7 +45,8 @@ def main(grid_paths: list[Path], no_gui: bool, iters: int, fps: int,
                           random_seed=random_seed)
         
         # Initialize agent
-        agent = RandomAgent()
+        agent = DQN()
+        # agent = RandomAgent()
         
         # Always reset the environment to initial state
         state = env.reset()
