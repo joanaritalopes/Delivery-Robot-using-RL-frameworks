@@ -10,9 +10,8 @@ for the final runs.
 Usage:
   python3 sweep.py                 # full sweep
   python3 sweep.py --agent dqn
-  python3 sweep.py --dry_run
-  python3 sweep.py --resume
-  python3 sweep.py --finalize
+  python3 sweep.py --resume        # if the sweep crashes or stop halfway through
+  python3 sweep.py --finalize      # run only the finalize step (re-running top-2 configs with 3 seeds and saving results)
 """
 
 import argparse
@@ -35,36 +34,32 @@ SWEEP_SEED  = 0
 FINAL_SEEDS = [0, 1, 2]
 
 DEFAULTS = {
-    "sigma":                 0.1,
-    "iter":                  500000,
-    "max_steps_per_episode": 2000,
-    "eval_every":            20,
-    "eval_episodes":         10,
-    "converge_patience":     5,
-    "converge_threshold":    0.95,
-    "lr":                    0.001,
-    "gamma":                 0.99,
-    "batch_size":            64,
-    "epsilon_decay":         0.9995,
-    "min_epsilon":           0.01,
-    "min_buffer":            1000,
-    "max_buffer":            50000,
-    "target_update":         200,
-    "clip_eps":              0.2,
-    "rollout_size":          256,
-    "ppo_epochs":            10,
-    "gae_lambda":            0.95,
-    "entropy_coef":          0.01,
-    "value_coef":            0.5,
+    "sigma":         0.1,
+    "iter":          500000,
+    "eval_every":    20,
+    "eval_episodes": 10,
+    "lr":            0.001,
+    "gamma":         0.99,
+    "batch_size":    64,
+    "epsilon_decay": 0.9995,
+    "min_epsilon":   0.01,
+    "min_buffer":    1000,
+    "max_buffer":    50000,
+    "target_update": 200,
+    "clip_eps":      0.2,
+    "rollout_size":  256,
+    "ppo_epochs":    10,
+    "gae_lambda":    0.95,
+    "entropy_coef":  0.01,
+    "value_coef":    0.5,
 }
 
 SHARED_SWEEP = {
-    "lr":                    [1e-4, 5e-4, 1e-3],
-    "gamma":                 [0.95, 0.97, 0.99, 0.999],
-    "sigma":                 [0.0, 0.05, 0.1, 0.2],
-    "iter":                  [200000, 500000, 1000000],
-    "max_steps_per_episode": [500, 1000, 2000, 5000],
-    "eval_every":            [10, 20, 50],
+    "lr":         [1e-4, 5e-4, 1e-3],
+    "gamma":      [0.95, 0.97, 0.99, 0.999],
+    "sigma":      [0.0, 0.05, 0.1, 0.2],
+    "iter":       [200000, 500000, 1000000],
+    "eval_every": [10, 20, 50],
 }
 
 DQN_SWEEP = {
@@ -114,31 +109,28 @@ def generate_configs(agents):
 
 def config_to_cmd(cfg):
     return [
-        "python", "train.py", cfg["grid"],
-        "--agent",                  cfg["agent"],
+        sys.executable, "train.py", cfg["grid"],
+        "--agent",          cfg["agent"],
         "--no_gui",
-        "--iter",                   str(cfg["iter"]),
-        "--sigma",                  str(cfg["sigma"]),
-        "--random_seed",            str(cfg["random_seed"]),
-        "--eval_every",             str(cfg["eval_every"]),
-        "--eval_episodes",          str(cfg["eval_episodes"]),
-        "--max_steps_per_episode",  str(cfg["max_steps_per_episode"]),
-        "--converge_patience",      str(cfg["converge_patience"]),
-        "--converge_threshold",     str(cfg["converge_threshold"]),
-        "--lr",                     str(cfg["lr"]),
-        "--gamma",                  str(cfg["gamma"]),
-        "--batch_size",             str(cfg["batch_size"]),
-        "--epsilon_decay",          str(cfg["epsilon_decay"]),
-        "--min_epsilon",            str(cfg["min_epsilon"]),
-        "--min_buffer",             str(cfg["min_buffer"]),
-        "--max_buffer",             str(cfg["max_buffer"]),
-        "--target_update",          str(cfg["target_update"]),
-        "--clip_eps",               str(cfg["clip_eps"]),
-        "--rollout_size",           str(cfg["rollout_size"]),
-        "--ppo_epochs",             str(cfg["ppo_epochs"]),
-        "--gae_lambda",             str(cfg["gae_lambda"]),
-        "--entropy_coef",           str(cfg["entropy_coef"]),
-        "--value_coef",             str(cfg["value_coef"]),
+        "--iter",           str(cfg["iter"]),
+        "--sigma",          str(cfg["sigma"]),
+        "--random_seed",    str(cfg["random_seed"]),
+        "--eval_every",     str(cfg["eval_every"]),
+        "--eval_episodes",  str(cfg["eval_episodes"]),
+        "--lr",             str(cfg["lr"]),
+        "--gamma",          str(cfg["gamma"]),
+        "--batch_size",     str(cfg["batch_size"]),
+        "--epsilon_decay",  str(cfg["epsilon_decay"]),
+        "--min_epsilon",    str(cfg["min_epsilon"]),
+        "--min_buffer",     str(cfg["min_buffer"]),
+        "--max_buffer",     str(cfg["max_buffer"]),
+        "--target_update",  str(cfg["target_update"]),
+        "--clip_eps",       str(cfg["clip_eps"]),
+        "--rollout_size",   str(cfg["rollout_size"]),
+        "--ppo_epochs",     str(cfg["ppo_epochs"]),
+        "--gae_lambda",     str(cfg["gae_lambda"]),
+        "--entropy_coef",   str(cfg["entropy_coef"]),
+        "--value_coef",     str(cfg["value_coef"]),
     ]
 
 
@@ -160,12 +152,8 @@ def extract_best_eval(eval_csv):
     return max(rows, key=lambda r: (r["eval_success_rate"], r["eval_mean_reward"]))
 
 
-def run_config(cfg, config_id, out_dir, dry_run=False):
+def run_config(cfg, config_id, out_dir):
     cmd = config_to_cmd(cfg)
-
-    if dry_run:
-        print(f"  [DRY RUN] {config_id}")
-        return {}
 
     results_dir = Path("results")
     results_dir.mkdir(exist_ok=True)
@@ -204,7 +192,7 @@ def cfg_to_cli(cfg, seed):
     return " ".join(str(c) for c in cmd)
 
 
-def finalize(results_dir, dry_run):
+def finalize(results_dir):
     summary_path = results_dir / "sweep_summary.csv"
     configs_path = results_dir / "configs.json"
 
@@ -260,7 +248,7 @@ def finalize(results_dir, dry_run):
                 run_cfg  = {**base_cfg, "random_seed": seed}
                 final_id = f"final_{agent}_{grid}_best{rank}_seed{seed}"
                 print(f"  Running {final_id}")
-                metrics  = run_config(run_cfg, final_id, final_dir, dry_run)
+                metrics  = run_config(run_cfg, final_id, final_dir)
                 with open(final_summary_path, "a", newline="") as f:
                     csv.DictWriter(f, fieldnames=final_fields).writerow({
                         "config_id":         final_id,
@@ -298,7 +286,6 @@ def finalize(results_dir, dry_run):
 def parse_args():
     p = argparse.ArgumentParser(description="OAT hyperparameter sweep for DQN and PPO.")
     p.add_argument("--agent", choices=["dqn", "ppo", "both"], default="both")
-    p.add_argument("--dry_run", action="store_true")
     p.add_argument("--finalize", action="store_true")
     p.add_argument("--results_dir", type=Path, default=Path("sweep_results"))
     p.add_argument("--resume", action="store_true")
@@ -311,7 +298,7 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if args.finalize:
-        finalize(out_dir, dry_run=args.dry_run)
+        finalize(out_dir)
         return
 
     agents  = ["dqn", "ppo"] if args.agent == "both" else [args.agent]
@@ -350,7 +337,7 @@ def main():
         with open(configs_path, "w") as f:
             json.dump(existing_cfgs, f, indent=2)
 
-        metrics = run_config(cfg, config_id, out_dir, dry_run=args.dry_run)
+        metrics = run_config(cfg, config_id, out_dir)
 
         with open(summary_path, "a", newline="") as f:
             csv.DictWriter(f, fieldnames=SUMMARY_FIELDS).writerow({
@@ -364,7 +351,7 @@ def main():
             })
 
     print("\nSweep done. Running finalize...\n")
-    finalize(out_dir, dry_run=args.dry_run)
+    finalize(out_dir)
 
 
 if __name__ == "__main__":
