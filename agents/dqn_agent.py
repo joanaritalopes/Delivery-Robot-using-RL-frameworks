@@ -139,10 +139,10 @@ class DQN(BaseAgent):
             batch = self.Experience(*zip(*samples))
 
             # Get mini batch variables
-            states = torch.tensor(batch.state, dtype=torch.float32).to(self.device)
+            states = torch.tensor(np.array(batch.state), dtype=torch.float32).to(self.device)
             actions = torch.tensor(batch.action, dtype=torch.long).to(self.device)
             rewards = torch.tensor(batch.reward, dtype=torch.float32).to(self.device)
-            next_states = torch.tensor(batch.next_state, dtype=torch.float32).to(self.device)
+            next_states = torch.tensor(np.array(batch.next_state), dtype=torch.float32).to(self.device)
             terminations = torch.tensor(batch.terminated, dtype=torch.bool).to(self.device)
 
             # Calculate MSE-loss
