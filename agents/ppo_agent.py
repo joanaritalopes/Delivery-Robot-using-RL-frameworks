@@ -27,7 +27,19 @@ class ActorCritic(nn.Module):
     
 
 class PPO(BaseAgent):
-    def __init__(self,state_dim=2,action_dim=4,lr=3e-4,gamma=0.99,gae_lambda=0.95,clip_eps=0.2,update_epochs=10,rollout_size=256,entropy_coef=0.01,value_coef=0.5):
+    def __init__(
+        self,
+        state_dim=2,
+        action_dim=4,
+        lr=3e-4,
+        gamma=0.99,
+        gae_lambda=0.95,
+        clip_eps=0.2,
+        update_epochs=10,
+        rollout_size=256,
+        entropy_coef=0.01,
+        value_coef=0.5
+    ):
 
         super().__init__()
         self.device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
