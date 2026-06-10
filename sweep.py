@@ -1,32 +1,18 @@
 """
 One-at-a-time (OAT) hyperparameter sweep for DQN and PPO.
 
-Early stopping: train.py is called with --converge_patience and
-   --converge_threshold. If eval_success_rate >= threshold for that many
-   consecutive eval checks, training stops before exhausting --iter
+Runs all configs with seed=0. After sweep, picks top-2 per (agent, grid)
+by eval_success_rate and re-runs each with seeds 0, 1, 2.
 
-Seeds = 3
+At the end, saves the best CLI commands to final_runs/best_commands.json
+for the final runs.
 
-Primary metric: eval_success_rate (delivery task completion rate), eval_mean_reward used as tiebreaker.
-
-Usage
-─────
-  python3 sweep.py                   # full sweep, both agents, 3 grids
+Usage:
+  python3 sweep.py                 # full sweep
   python3 sweep.py --agent dqn
   python3 sweep.py --dry_run
   python3 sweep.py --resume
   python3 sweep.py --finalize
-
-Output
-──────
-  sweep_results/
-    sweep_summary.csv
-    configs.json
-    commands_run.txt
-    <config_id>_eval.csv
-    <config_id>_train.csv
-    final_runs/
-      final_summary.csv
 """
 
 import argparse
@@ -36,7 +22,6 @@ import subprocess
 import sys
 import pandas as pd
 from collections import defaultdict
-from datetime import datetime
 from pathlib import Path
 
 
@@ -99,15 +84,8 @@ PPO_SWEEP = {
 }
 
 SUMMARY_FIELDS = [
-    "config_id", "agent", "grid", "swept_param", "swept_value", "random_seed",
-    "sigma", "iter", "max_steps_per_episode", "eval_every",
-    "converge_patience", "converge_threshold",
-    "lr", "gamma",
-    "batch_size", "epsilon_decay", "min_buffer", "max_buffer", "target_update",
-    "clip_eps", "rollout_size", "ppo_epochs", "gae_lambda",
-    "entropy_coef", "value_coef",
-    "best_eval_episode", "best_eval_steps",
-    "eval_success_rate", "eval_mean_reward", "eval_std_reward", "eval_mean_length",
+    "config_id", "agent", "grid", "swept_param", "swept_value",
+    "eval_success_rate", "eval_mean_reward",
 ]
 
 
@@ -136,7 +114,7 @@ def generate_configs(agents):
 
 def config_to_cmd(cfg):
     return [
-        sys.executable, "train.py", cfg["grid"],
+        "python", "train.py", cfg["grid"],
         "--agent",                  cfg["agent"],
         "--no_gui",
         "--iter",                   str(cfg["iter"]),
@@ -172,31 +150,21 @@ def extract_best_eval(eval_csv):
         for row in csv.DictReader(f):
             try:
                 rows.append({
-                    "episode":           int(row["episode"]),
-                    "steps_so_far":      int(row["steps_so_far"]),
-                    "eval_mean_reward":  float(row["eval_mean_reward"]),
-                    "eval_std_reward":   float(row["eval_std_reward"]),
                     "eval_success_rate": float(row["eval_success_rate"]),
-                    "eval_mean_length":  float(row["eval_mean_length"]),
+                    "eval_mean_reward":  float(row["eval_mean_reward"]),
                 })
             except (ValueError, KeyError):
                 continue
     if not rows:
         return {}
-    return max(rows, key=lambda r: (r["eval_success_rate"], r["eval_mean_reward"], r["episode"]))
+    return max(rows, key=lambda r: (r["eval_success_rate"], r["eval_mean_reward"]))
 
 
-def run_config(cfg, config_id, out_dir, cmd_log, dry_run=False):
+def run_config(cfg, config_id, out_dir, dry_run=False):
     cmd = config_to_cmd(cfg)
-    with open(cmd_log, "a") as f:
-        f.write(f"[{datetime.now().isoformat()}] [{config_id}] {' '.join(str(c) for c in cmd)}\n")
-
-    print(f"\n  Config: {config_id}")
-    print(f"  Agent:  {cfg['agent']}  |  Grid: {Path(cfg['grid']).stem}")
-    print(f"  Sweep:  {cfg['swept_param']} = {cfg['swept_value']}  |  Seed: {cfg['random_seed']}")
 
     if dry_run:
-        print("  [DRY RUN]")
+        print(f"  [DRY RUN] {config_id}")
         return {}
 
     results_dir = Path("results")
@@ -205,7 +173,7 @@ def run_config(cfg, config_id, out_dir, cmd_log, dry_run=False):
 
     result = subprocess.run(cmd, capture_output=False, text=True)
     if result.returncode != 0:
-        print(f"  [WARNING] train.py exited with code {result.returncode}")
+        print(f"  [WARNING] {config_id} exited with code {result.returncode}")
 
     after = set(results_dir.glob("*.csv"))
     eval_dest  = out_dir / f"{config_id}_eval.csv"
@@ -231,43 +199,9 @@ def make_config_id(cfg, existing):
     return config_id
 
 
-def build_summary_row(config_id, cfg, best, grid=None, rank=None):
-    row = {
-        "config_id":             config_id,
-        "agent":                 cfg["agent"],
-        "grid":                  grid or Path(cfg["grid"]).stem,
-        "swept_param":           cfg.get("swept_param", ""),
-        "swept_value":           cfg.get("swept_value", ""),
-        "random_seed":           cfg["random_seed"],
-        "sigma":                 cfg["sigma"],
-        "iter":                  cfg["iter"],
-        "max_steps_per_episode": cfg["max_steps_per_episode"],
-        "eval_every":            cfg["eval_every"],
-        "converge_patience":     cfg["converge_patience"],
-        "converge_threshold":    cfg["converge_threshold"],
-        "lr":                    cfg["lr"],
-        "gamma":                 cfg["gamma"],
-        "batch_size":            cfg["batch_size"],
-        "epsilon_decay":         cfg["epsilon_decay"],
-        "min_buffer":            cfg["min_buffer"],
-        "max_buffer":            cfg["max_buffer"],
-        "target_update":         cfg["target_update"],
-        "clip_eps":              cfg["clip_eps"],
-        "rollout_size":          cfg["rollout_size"],
-        "ppo_epochs":            cfg["ppo_epochs"],
-        "gae_lambda":            cfg["gae_lambda"],
-        "entropy_coef":          cfg["entropy_coef"],
-        "value_coef":            cfg["value_coef"],
-        "best_eval_episode":     best.get("episode", ""),
-        "best_eval_steps":       best.get("steps_so_far", ""),
-        "eval_success_rate":     best.get("eval_success_rate", ""),
-        "eval_mean_reward":      best.get("eval_mean_reward", ""),
-        "eval_std_reward":       best.get("eval_std_reward", ""),
-        "eval_mean_length":      best.get("eval_mean_length", ""),
-    }
-    if rank is not None:
-        row["rank"] = rank
-    return row
+def cfg_to_cli(cfg, seed):
+    cmd = config_to_cmd({**cfg, "random_seed": seed})
+    return " ".join(str(c) for c in cmd)
 
 
 def finalize(results_dir, dry_run):
@@ -298,9 +232,9 @@ def finalize(results_dir, dry_run):
     final_dir = results_dir / "final_runs"
     final_dir.mkdir(parents=True, exist_ok=True)
     final_summary_path = final_dir / "final_summary.csv"
-    final_cmd_log      = final_dir / "commands_run.txt"
 
-    final_fields = SUMMARY_FIELDS + ["rank"]
+    final_fields = ["config_id", "agent", "grid", "best", "seed",
+                    "eval_success_rate", "eval_mean_reward"]
     with open(final_summary_path, "w", newline="") as f:
         csv.DictWriter(f, fieldnames=final_fields).writeheader()
 
@@ -308,17 +242,13 @@ def finalize(results_dir, dry_run):
     for row in rows:
         groups[(row["agent"], row["grid"])].append(row)
 
+    best_configs = {}
+
     for (agent, grid), group_rows in sorted(groups.items()):
         top2 = sorted(group_rows,
                       key=lambda r: (r["eval_success_rate"], r["eval_mean_reward"]),
                       reverse=True)[:2]
-
-        print(f"\n[{agent.upper()} | {grid}]")
-        for rank, row in enumerate(top2, 1):
-            print(f"  #{rank}: {row['config_id']} | "
-                  f"success={row['eval_success_rate']:.3f} | "
-                  f"reward={row['eval_mean_reward']:.2f} | "
-                  f"{row['swept_param']}={row['swept_value']}")
+        best_configs[(agent, grid)] = top2
 
         for rank, row in enumerate(top2, 1):
             cfg_id = row["config_id"]
@@ -328,20 +258,41 @@ def finalize(results_dir, dry_run):
             base_cfg = all_configs[cfg_id]
             for seed in FINAL_SEEDS:
                 run_cfg  = {**base_cfg, "random_seed": seed}
-                final_id = f"final_{agent}_{grid}_rank{rank}_seed{seed}"
-                best     = run_config(run_cfg, final_id, final_dir, final_cmd_log, dry_run)
-                out_row  = build_summary_row(final_id, run_cfg, best, grid=grid, rank=rank)
+                final_id = f"final_{agent}_{grid}_best{rank}_seed{seed}"
+                print(f"  Running {final_id}")
+                metrics  = run_config(run_cfg, final_id, final_dir, dry_run)
                 with open(final_summary_path, "a", newline="") as f:
-                    csv.DictWriter(f, fieldnames=final_fields).writerow(out_row)
+                    csv.DictWriter(f, fieldnames=final_fields).writerow({
+                        "config_id":         final_id,
+                        "agent":             agent,
+                        "grid":              grid,
+                        "best":              rank,
+                        "seed":              seed,
+                        "eval_success_rate": metrics.get("eval_success_rate", ""),
+                        "eval_mean_reward":  metrics.get("eval_mean_reward", ""),
+                    })
 
     df = pd.read_csv(final_summary_path)
     summary = (
-        df.groupby(["agent", "grid", "rank"])["eval_success_rate"]
+        df.groupby(["agent", "grid", "best"])["eval_success_rate"]
         .agg(["mean", "std"])
         .round(4)
     )
     print(f"\neval_success_rate — mean ± std across {len(FINAL_SEEDS)} seeds:\n")
     print(summary.to_string())
+
+    best_commands = {}
+    for (agent, grid), top2 in best_configs.items():
+        key = f"{agent}_{Path(grid).stem}"
+        best_commands[key] = {}
+        for rank, row in enumerate(top2, 1):
+            cfg_id = row["config_id"]
+            if cfg_id not in all_configs:
+                continue
+            best_commands[key][f"best{rank}"] = cfg_to_cli(all_configs[cfg_id], seed=0)
+
+    with open(final_dir / "best_commands.json", "w") as f:
+        json.dump(best_commands, f, indent=2)
 
 
 def parse_args():
@@ -367,7 +318,6 @@ def main():
     configs = generate_configs(agents)
 
     summary_path = out_dir / "sweep_summary.csv"
-    cmd_log_path = out_dir / "commands_run.txt"
     configs_path = out_dir / "configs.json"
 
     done_ids = set()
@@ -386,29 +336,35 @@ def main():
             existing_cfgs = json.load(f)
 
     total = len(configs)
-    print(f"Sweep: {total} configs | Agents: {agents} | Grids: {len(GRIDS)}")
+    print(f"Sweeping: {total} configs | agents: {agents} | grids: {len(GRIDS)}\n")
 
     for i, cfg in enumerate(configs, 1):
         config_id = make_config_id(cfg, existing_cfgs)
-        print(f"[{i:>4}/{total}] {config_id}", end="", flush=True)
 
         if config_id in done_ids:
-            print("  [SKIP]")
             continue
-        print()
+
+        print(f"[{i}/{total}] {cfg['agent']} | {Path(cfg['grid']).stem} | {cfg['swept_param']}={cfg['swept_value']}")
 
         existing_cfgs[config_id] = cfg
         with open(configs_path, "w") as f:
             json.dump(existing_cfgs, f, indent=2)
 
-        best = run_config(cfg, config_id, out_dir, cmd_log_path, dry_run=args.dry_run)
+        metrics = run_config(cfg, config_id, out_dir, dry_run=args.dry_run)
 
-        row = build_summary_row(config_id, cfg, best)
         with open(summary_path, "a", newline="") as f:
-            csv.DictWriter(f, fieldnames=SUMMARY_FIELDS).writerow(row)
+            csv.DictWriter(f, fieldnames=SUMMARY_FIELDS).writerow({
+                "config_id":         config_id,
+                "agent":             cfg["agent"],
+                "grid":              Path(cfg["grid"]).stem,
+                "swept_param":       cfg["swept_param"],
+                "swept_value":       cfg["swept_value"],
+                "eval_success_rate": metrics.get("eval_success_rate", ""),
+                "eval_mean_reward":  metrics.get("eval_mean_reward", ""),
+            })
 
-    print(f"\nSweep done. Results: {summary_path}")
-    print(f"Next: python3 sweep.py --finalize --results_dir {out_dir}")
+    print("\nSweep done. Running finalize...\n")
+    finalize(out_dir, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
