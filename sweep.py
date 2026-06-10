@@ -10,6 +10,7 @@ for the final runs.
 Usage:
   python3 sweep.py                 # full sweep
   python3 sweep.py --agent dqn
+  python3 sweep.py --agent dqn --grids fishbone --results_dir sweep_test
   python3 sweep.py --resume        # if the sweep crashes or stop halfway through
   python3 sweep.py --finalize      # run only the finalize step (re-running top-2 configs with 3 seeds and saving results)
 """
@@ -84,7 +85,9 @@ SUMMARY_FIELDS = [
 ]
 
 
-def generate_configs(agents):
+def generate_configs(agents, grids=None):
+    if grids is None:
+        grids = GRIDS
     configs = []
     for agent in agents:
         param_sweeps = dict(SHARED_SWEEP)
@@ -286,6 +289,10 @@ def finalize(results_dir):
 def parse_args():
     p = argparse.ArgumentParser(description="OAT hyperparameter sweep for DQN and PPO.")
     p.add_argument("--agent", choices=["dqn", "ppo", "both"], default="both")
+    p.add_argument("--grids", nargs="+",
+                   choices=["fishbone", "flying_v", "half_aisles"],
+                   default=["fishbone", "flying_v", "half_aisles"],
+                   help="Which grid(s) to sweep. Default: all three.")
     p.add_argument("--finalize", action="store_true")
     p.add_argument("--results_dir", type=Path, default=Path("sweep_results"))
     p.add_argument("--resume", action="store_true")
@@ -302,7 +309,8 @@ def main():
         return
 
     agents  = ["dqn", "ppo"] if args.agent == "both" else [args.agent]
-    configs = generate_configs(agents)
+    grids   = [f"grid_configs/{g}.npy" for g in args.grids]
+    configs = generate_configs(agents, grids)
 
     summary_path = out_dir / "sweep_summary.csv"
     configs_path = out_dir / "configs.json"
@@ -323,7 +331,7 @@ def main():
             existing_cfgs = json.load(f)
 
     total = len(configs)
-    print(f"Sweeping: {total} configs | agents: {agents} | grids: {len(GRIDS)}\n")
+    print(f"Sweeping: {total} configs | agents: {agents} | grids: {args.grids}\n")
 
     for i, cfg in enumerate(configs, 1):
         config_id = make_config_id(cfg, existing_cfgs)
