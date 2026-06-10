@@ -127,22 +127,12 @@ PPO_SWEEP = {
 }
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Config generation
-# ──────────────────────────────────────────────────────────────────────────────
-
 def generate_configs(agents: list[str]) -> list[dict]:
     """
     Generate all OAT configs.
 
     For each (agent, grid, param, value) combination, one config dict is
     produced with all parameters at default except the swept one.
-    One baseline config (all defaults) is also generated per (agent, grid).
-
-    NOTE on package location: no config ever passes package coordinates to
-    train.py. The environment handles package placement internally; the agent
-    only observes the state vector [gps_x, gps_y, lidar×8, carrying_flag].
-    This ensures the agent cannot infer package location from its observation.
     """
     configs = []
 
@@ -155,7 +145,7 @@ def generate_configs(agents: list[str]) -> list[dict]:
             param_sweeps.update(PPO_SWEEP)
 
         for grid in GRIDS:
-            # ── Baseline: all defaults ───────────────────────────────────
+            # Baseline: all defaults
             baseline = {
                 "agent":       agent,
                 "grid":        grid,
@@ -166,7 +156,7 @@ def generate_configs(agents: list[str]) -> list[dict]:
             }
             configs.append(baseline)
 
-            # ── OAT: vary one param at a time ────────────────────────────
+            # OAT: vary one param at a time
             for param, values in param_sweeps.items():
                 for value in values:
                     # Skip if this equals the default (baseline covers it)
@@ -186,10 +176,6 @@ def generate_configs(agents: list[str]) -> list[dict]:
     return configs
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Command builder
-# ──────────────────────────────────────────────────────────────────────────────
-
 def config_to_cmd(cfg: dict) -> list[str]:
     """
     Build the train.py CLI command for this config.
@@ -197,11 +183,6 @@ def config_to_cmd(cfg: dict) -> list[str]:
     Early stopping flags:
       --converge_patience  N  stop if eval_success_rate ≥ threshold for N evals
       --converge_threshold T  success rate threshold for early stopping
-    These implement the professor's requirement:
-      "stop training either once it converges or runs out of steps budget"
-    Literature justification: fixed step budget is used in Mnih et al. (2015)
-    and Schulman et al. (2017); convergence-based stopping is used in
-    Henderson et al. (2018) and Andrychowicz et al. (2020).
     """
     return [
         sys.executable, "train.py",
@@ -236,17 +217,10 @@ def config_to_cmd(cfg: dict) -> list[str]:
     ]
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Result extraction
-# ──────────────────────────────────────────────────────────────────────────────
-
 def extract_best_eval(eval_csv: Path) -> dict:
     """
     Read an eval CSV and return the row with the highest eval_success_rate.
     Tiebreaker: eval_mean_reward (higher = better), then latest episode.
-
-    Primary metric is eval_success_rate as recommended by the professor:
-    it directly measures whether the agent completes its delivery task.
     """
     if not eval_csv.exists():
         return {}
@@ -272,10 +246,6 @@ def extract_best_eval(eval_csv: Path) -> dict:
     )
     return best
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Run one config
-# ──────────────────────────────────────────────────────────────────────────────
 
 def run_config(cfg: dict, config_id: str, out_dir: Path,
                cmd_log: Path, dry_run: bool = False) -> dict:
@@ -326,10 +296,6 @@ def run_config(cfg: dict, config_id: str, out_dir: Path,
 
     return extract_best_eval(eval_dest)
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Summary CSV
-# ──────────────────────────────────────────────────────────────────────────────
 
 SUMMARY_FIELDS = [
     "config_id", "agent", "grid", "swept_param", "swept_value", "random_seed",
@@ -392,17 +358,13 @@ def append_summary(path: Path, cfg: dict, config_id: str, best: dict):
         csv.DictWriter(f, fieldnames=SUMMARY_FIELDS).writerow(row)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Finalize: top-2 per (agent, grid) × 3 seeds
-# ──────────────────────────────────────────────────────────────────────────────
-
 def finalize(results_dir: Path, dry_run: bool):
     """
     Read sweep_summary.csv. For each (agent, grid) group, pick the top 2
     configs ranked by eval_success_rate DESC, eval_mean_reward DESC.
     Re-run each winning config with all 3 seeds and save to final_runs/.
 
-    This gives you the 2-best-models-per-agent-per-grid table the professor
+    This gives the 2-best-models-per-agent-per-grid table the professor
     requested, with mean ± std across 3 seeds for statistical significance.
     """
     summary_path = results_dir / "sweep_summary.csv"
@@ -441,7 +403,7 @@ def finalize(results_dir: Path, dry_run: bool):
         csv.DictWriter(f, fieldnames=final_fields).writeheader()
 
     print(f"\n{'='*72}")
-    print(f"FINALIZE: top-2 configs × {len(FINAL_SEEDS)} seeds "
+    print(f"FINALIZE: top-2 configs x {len(FINAL_SEEDS)} seeds "
           f"per (agent, grid)")
     print(f"Seeds: {FINAL_SEEDS}  (literature: Henderson et al., 2018)")
     print(f"Primary metric: eval_success_rate")
@@ -526,13 +488,9 @@ def finalize(results_dir: Path, dry_run: bool):
     print(f"    print(g.agg(['mean','std']))\"")
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Main sweep loop
-# ──────────────────────────────────────────────────────────────────────────────
-
 def parse_args():
     p = argparse.ArgumentParser(
-        description="OAT hyperparameter sweep for DQN and PPO.")
+        description="Hyperparameter sweep for DQN and PPO.")
     p.add_argument("--agent", choices=["dqn", "ppo", "both"], default="both",
                    help="Which agent(s) to sweep.")
     p.add_argument("--dry_run", action="store_true",
@@ -597,9 +555,6 @@ def main():
     print(f"\nEarly stopping: enabled (patience={DEFAULTS['converge_patience']}, "
           f"threshold={DEFAULTS['converge_threshold']})")
     print(f"Seeds per config: 1 (seed=0). Final runs: {len(FINAL_SEEDS)} seeds.")
-    print(f"\nNOTE: Package location is NOT in the state vector.")
-    print(f"State = [gps_x, gps_y, lidar×8, carrying_flag] — 11 floats.")
-    print(f"The agent has no direct access to package coordinates.\n")
 
     for i, cfg in enumerate(configs, 1):
         config_id = make_config_id(cfg, existing_cfgs)
