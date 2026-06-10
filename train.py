@@ -43,7 +43,7 @@ def parse_args():
                    help="Sigma value for the stochasticity of the environment.")
     p.add_argument("--fps", type=int, default=30,
                    help="Frames per second to render at. Only used if no_gui is not set.")
-    p.add_argument("--iter", type=int, default=500000,
+    p.add_argument("--iter", type=int, default=200000,
                    help="Total number of steps to train for (across all episodes).")
     p.add_argument("--random_seed", type=int, default=0,
                    help="Random seed value for the environment.")
