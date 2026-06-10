@@ -1,16 +1,22 @@
 """
 One-at-a-time (OAT) hyperparameter sweep for DQN and PPO.
 
-
-2. Early stopping: train.py is called with --converge_patience and
+Early stopping: train.py is called with --converge_patience and
    --converge_threshold. If eval_success_rate ≥ threshold for that many
-   consecutive eval checks, training stops before exhausting --iter.
-   This is the standard practice in RL (e.g. Mnih et al., 2015 used a
-   fixed step budget; Schulman et al., 2017 used a reward threshold).
-   We implement BOTH: stop on convergence OR exhaust the step budget,
-   whichever comes first — a common approach in recent literature
-   (Henderson et al., 2018 "Deep RL That Matters"; Andrychowicz et al.,
-   2020 "What Matters in On-Policy Reinforcement Learning").
+   consecutive eval checks, training stops before exhausting --iter
+
+Seeds = 3
+
+Primary metric: eval_success_rate (delivery task completion rate),
+   as recommended by the professor. eval_mean_reward used as tiebreaker.
+
+Sweepable environment/training parameters:
+   - max_steps_per_episode: caps each episode so early training doesn't
+     spend all budget on one random walk
+   - iter (total step budget): test if more steps help
+   - eval_every: how often to checkpoint (affects early stopping granularity)
+   - sigma: environment stochasticity
+   All hyperparameters (lr, gamma, batch_size, etc.) are also swept.
 
 Usage
 ─────
@@ -36,8 +42,8 @@ Output
     sweep_summary.csv        one row per config, best eval metrics
     configs.json             config dict per config_id (needed for finalize)
     commands_run.txt         full audit log of all commands executed
-    <config_id>_eval.csv     eval CSV from train.py
-    <config_id>_train.csv    train CSV from train.py
+    <config_id>_eval.csv    eval CSV from train.py (moved here)
+    <config_id>_train.csv   train CSV from train.py (moved here)
     final_runs/
       final_summary.csv      best 2 configs x 3 seeds x 6 combos = 36 rows
 """
@@ -63,11 +69,11 @@ FINAL_SEEDS = [0, 1, 2]          # 3 seeds for final top-2 validation
 
 DEFAULTS = {
     # ── Environment / training ──────────────────────────────────────────────
-    "sigma":                 0.1,    # env stochasticity (action noise)
+    "sigma":                 0.1,    # env stochasticity
     "iter":                  500000, # total step budget
     "max_steps_per_episode": 2000,   # cap per episode (prevents runaway episodes)
-    "eval_every":            20,     # eval checkpoint frequency (in episodes)
-    "eval_episodes":         10,     # episodes per eval checkpoint
+    "eval_every":            20,     # evaluation checkpoint frequency (in episodes)
+    "eval_episodes":         10,     # episodes per evaluation checkpoint
     "converge_patience":     5,      # consecutive evals at threshold to stop early
     "converge_threshold":    0.95,   # success rate that counts as "converged"
     # ── Shared hyperparameters ───────────────────────────────────────────────
@@ -89,26 +95,18 @@ DEFAULTS = {
     "value_coef":            0.5,
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Sweep grid (OAT)
-# Values are chosen to bracket the default on both sides where possible.
-# The default value MUST appear in each list (it is the baseline point and
-# is included here for documentation — but we skip it when generating
-# configs since the baseline already covers it).
-# ──────────────────────────────────────────────────────────────────────────────
 
-# Parameters that apply to BOTH agents
 SHARED_SWEEP = {
-    "lr":    [1e-4, 5e-4, 1e-3, 3e-3, 1e-2],           # default: 1e-3
-    "gamma": [0.95, 0.97, 0.99, 0.999],                 # default: 0.99
+    "lr":    [1e-4, 5e-4, 1e-3],
+    "gamma": [0.95, 0.97, 0.99, 0.999],
     # ── Environment parameters ──────────────────────────────────────────────
-    "sigma":                 [0.0, 0.05, 0.1, 0.2],     # default: 0.1
-    "iter":                  [200000, 500000, 1000000],  # default: 500000
-    "max_steps_per_episode": [500, 1000, 2000, 5000],   # default: 2000
-    "eval_every":            [10, 20, 50],               # default: 20
+    "sigma":                 [0.0, 0.05, 0.1, 0.2],
+    "iter":                  [200000, 500000, 1000000],
+    "max_steps_per_episode": [500, 1000, 2000, 5000],
+    "eval_every":            [10, 20, 50],
 }
 
-# DQN-only parameters
+
 DQN_SWEEP = {
     "epsilon_decay": [0.999, 0.9995, 0.9998, 0.99995],  # default: 0.9995
     "batch_size":    [32, 64, 128, 256],                 # default: 64
@@ -130,9 +128,9 @@ PPO_SWEEP = {
 def generate_configs(agents: list[str]) -> list[dict]:
     """
     Generate all OAT configs.
-
     For each (agent, grid, param, value) combination, one config dict is
     produced with all parameters at default except the swept one.
+    One baseline config (all defaults) is also generated per (agent, grid).
     """
     configs = []
 
@@ -145,7 +143,6 @@ def generate_configs(agents: list[str]) -> list[dict]:
             param_sweeps.update(PPO_SWEEP)
 
         for grid in GRIDS:
-            # Baseline: all defaults
             baseline = {
                 "agent":       agent,
                 "grid":        grid,
@@ -156,7 +153,6 @@ def generate_configs(agents: list[str]) -> list[dict]:
             }
             configs.append(baseline)
 
-            # OAT: vary one param at a time
             for param, values in param_sweeps.items():
                 for value in values:
                     # Skip if this equals the default (baseline covers it)
@@ -179,7 +175,6 @@ def generate_configs(agents: list[str]) -> list[dict]:
 def config_to_cmd(cfg: dict) -> list[str]:
     """
     Build the train.py CLI command for this config.
-
     Early stopping flags:
       --converge_patience  N  stop if eval_success_rate ≥ threshold for N evals
       --converge_threshold T  success rate threshold for early stopping
@@ -272,14 +267,13 @@ def run_config(cfg: dict, config_id: str, out_dir: Path,
         print("  [DRY RUN — not executing]")
         return {}
 
-    # Snapshot results/ before running so we can identify new files
     results_dir = Path("results")
     results_dir.mkdir(exist_ok=True)
     before = set(results_dir.glob("*.csv"))
 
     result = subprocess.run(cmd, capture_output=False, text=True)
     if result.returncode != 0:
-        print(f"  [WARNING] train.py exited with code {result.returncode}")
+        print(f"warning: train.py exited with code {result.returncode}")
 
     # Identify CSVs created by this run and move them to out_dir
     after = set(results_dir.glob("*.csv"))
@@ -360,12 +354,11 @@ def append_summary(path: Path, cfg: dict, config_id: str, best: dict):
 
 def finalize(results_dir: Path, dry_run: bool):
     """
-    Read sweep_summary.csv. For each (agent, grid) group, pick the top 2
-    configs ranked by eval_success_rate DESC, eval_mean_reward DESC.
-    Re-run each winning config with all 3 seeds and save to final_runs/.
+    Read sweep_summary.csv. For each (agent, grid) group, pick top 2
+    configs ranked by eval_success_rate DESC.
+    Re-run each winning config with all 3 seeds and save to final_runs.
 
-    This gives the 2-best-models-per-agent-per-grid table the professor
-    requested, with mean ± std across 3 seeds for statistical significance.
+    Returns 2-best-models-per-agent-per-grid table.
     """
     summary_path = results_dir / "sweep_summary.csv"
     configs_path = results_dir / "configs.json"
@@ -403,9 +396,9 @@ def finalize(results_dir: Path, dry_run: bool):
         csv.DictWriter(f, fieldnames=final_fields).writeheader()
 
     print(f"\n{'='*72}")
-    print(f"FINALIZE: top-2 configs x {len(FINAL_SEEDS)} seeds "
+    print(f"Top-2 configs x {len(FINAL_SEEDS)} seeds "
           f"per (agent, grid)")
-    print(f"Seeds: {FINAL_SEEDS}  (literature: Henderson et al., 2018)")
+    print(f"Seeds: {FINAL_SEEDS}")
     print(f"Primary metric: eval_success_rate")
     print(f"{'='*72}")
 
@@ -490,7 +483,7 @@ def finalize(results_dir: Path, dry_run: bool):
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="Hyperparameter sweep for DQN and PPO.")
+        description="OAT hyperparameter sweep for DQN and PPO")
     p.add_argument("--agent", choices=["dqn", "ppo", "both"], default="both",
                    help="Which agent(s) to sweep.")
     p.add_argument("--dry_run", action="store_true",
@@ -555,6 +548,9 @@ def main():
     print(f"\nEarly stopping: enabled (patience={DEFAULTS['converge_patience']}, "
           f"threshold={DEFAULTS['converge_threshold']})")
     print(f"Seeds per config: 1 (seed=0). Final runs: {len(FINAL_SEEDS)} seeds.")
+    print(f"\nPackage location is not in the state vector.")
+    print(f"State = [gps_x, gps_y] — 2 floats (normalized row, col).")
+    print(f"The agent has no direct access to package coordinates.\n")
 
     for i, cfg in enumerate(configs, 1):
         config_id = make_config_id(cfg, existing_cfgs)
