@@ -2,12 +2,16 @@
 Train RL Agent.
 
 Usage example:
+    # train on 1 grid
     python3 train.py grid_configs/example_grid.npy --agent dqn --no_gui --iter 100000
+    # train on multiple grids
+    python3 train.py grid_configs/fishbone.npy grid_configs/flying_v.npy grid_configs/warehouse_small.npy --agent dqn --no_gui
 """
 
 import csv
 from argparse import ArgumentParser
 from datetime import datetime
+import numpy as np
 from pathlib import Path
 from tqdm import trange
 
@@ -36,7 +40,7 @@ def parse_args():
                    help="Agent start position as row,col (e.g. 2,3).")
     p.add_argument("--eval_every", type=int, default=10,
                    help="Run evaluation every N episodes during training.")
-    p.add_argument("--eval_episodes", type=int, default=10,
+    p.add_argument("--eval_episodes", type=int, default=30,
                    help="Number of episodes to run during each evaluation.")
     return p.parse_args()
 
@@ -52,7 +56,6 @@ def build_agent(agent_name: str):
             raise ValueError(f"Unknown agent: {agent_name}")
 
 
-# There is a mismatch in the updates of the agents - this loop handles, otherwise we can fix directly in them and take this out
 def agent_update(agent, state, next_state, reward, action, terminated):
     """
     Handles the different update signatures of DQN and PPO.
@@ -304,7 +307,6 @@ def final_evaluate(agent, grid_fp: Path, total_steps: int,
         random_seed=random_seed,
         show_images=False,
     )
-
 
 
 def main():
