@@ -35,48 +35,50 @@ SWEEP_SEED  = 0
 FINAL_SEEDS = [0, 1, 2]
 
 DEFAULTS = {
-    "sigma":         0.1,
-    "iter":          500000,
-    "eval_every":    20,
-    "eval_episodes": 10,
-    "lr":            0.001,
-    "gamma":         0.99,
-    "batch_size":    64,
-    "epsilon_decay": 0.9995,
-    "min_epsilon":   0.01,
-    "min_buffer":    1000,
-    "max_buffer":    50000,
-    "target_update": 200,
-    "clip_eps":      0.2,
-    "rollout_size":  256,
-    "ppo_epochs":    10,
-    "gae_lambda":    0.95,
-    "entropy_coef":  0.01,
-    "value_coef":    0.5,
+    "sigma":              0.1,
+    "iter":               500000,
+    "eval_every":         20,
+    "eval_episodes":      10,
+    "converge_patience":  5,
+    "converge_threshold": 0.95,
+    "lr":                 0.001,
+    "gamma":              0.99,
+    "batch_size":         64,
+    "epsilon_decay":      0.9995,
+    "min_epsilon":        0.01,
+    "min_buffer":         1000,
+    "max_buffer":         50000,
+    "target_update":      200,
+    "clip_eps":           0.2,
+    "rollout_size":       256,
+    "ppo_epochs":         10,
+    "gae_lambda":         0.95,
+    "entropy_coef":       0.01,
+    "value_coef":         0.5,
 }
 
 SHARED_SWEEP = {
-    "lr":         [1e-4, 5e-4, 1e-3],
-    "gamma":      [0.95, 0.97, 0.99, 0.999],
-    "sigma":      [0.0, 0.05, 0.1, 0.2],
-    "iter":       [200000, 500000, 1000000],
-    "eval_every": [10, 20, 50],
+    "lr":         [1e-4, 5e-3],
+    "gamma":      [0.95, 0.999],
+    "sigma":      [0.0, 0.2],
+    "iter":       [200000, 1000000],
+    "eval_every": [10, 50],
 }
 
 DQN_SWEEP = {
-    "epsilon_decay": [0.999, 0.9995, 0.9998, 0.99995],
-    "batch_size":    [32, 64, 128, 256],
-    "target_update": [100, 200, 500, 1000],
-    "max_buffer":    [10000, 50000, 100000, 200000],
+    "epsilon_decay": [0.999, 0.99995],
+    "batch_size":    [32, 256],
+    "target_update": [100, 1000],
+    "max_buffer":    [10000, 200000],
 }
 
 PPO_SWEEP = {
-    "clip_eps":     [0.1, 0.2, 0.3, 0.4],
-    "rollout_size": [128, 256, 512, 1024],
-    "ppo_epochs":   [5, 10, 20, 40],
-    "gae_lambda":   [0.9, 0.95, 0.98, 1.0],
-    "entropy_coef": [0.0, 0.01, 0.05, 0.1],
-    "value_coef":   [0.25, 0.5, 1.0],
+    "clip_eps":     [0.1, 0.4],
+    "rollout_size": [128, 1024],
+    "ppo_epochs":   [5, 40],
+    "gae_lambda":   [0.9, 1.0],
+    "entropy_coef": [0.0, 0.1],
+    "value_coef":   [0.25, 1.0],
 }
 
 SUMMARY_FIELDS = [
@@ -92,7 +94,7 @@ def generate_configs(agents, grids=None):
     for agent in agents:
         param_sweeps = dict(SHARED_SWEEP)
         param_sweeps.update(DQN_SWEEP if agent == "dqn" else PPO_SWEEP)
-        for grid in GRIDS:
+        for grid in grids:
             configs.append({
                 "agent": agent, "grid": grid,
                 "swept_param": "baseline", "swept_value": "default",
@@ -113,27 +115,29 @@ def generate_configs(agents, grids=None):
 def config_to_cmd(cfg):
     return [
         sys.executable, "train.py", cfg["grid"],
-        "--agent",          cfg["agent"],
+        "--agent",              cfg["agent"],
         "--no_gui",
-        "--iter",           str(cfg["iter"]),
-        "--sigma",          str(cfg["sigma"]),
-        "--random_seed",    str(cfg["random_seed"]),
-        "--eval_every",     str(cfg["eval_every"]),
-        "--eval_episodes",  str(cfg["eval_episodes"]),
-        "--lr",             str(cfg["lr"]),
-        "--gamma",          str(cfg["gamma"]),
-        "--batch_size",     str(cfg["batch_size"]),
-        "--epsilon_decay",  str(cfg["epsilon_decay"]),
-        "--min_epsilon",    str(cfg["min_epsilon"]),
-        "--min_buffer",     str(cfg["min_buffer"]),
-        "--max_buffer",     str(cfg["max_buffer"]),
-        "--target_update",  str(cfg["target_update"]),
-        "--clip_eps",       str(cfg["clip_eps"]),
-        "--rollout_size",   str(cfg["rollout_size"]),
-        "--ppo_epochs",     str(cfg["ppo_epochs"]),
-        "--gae_lambda",     str(cfg["gae_lambda"]),
-        "--entropy_coef",   str(cfg["entropy_coef"]),
-        "--value_coef",     str(cfg["value_coef"]),
+        "--iter",               str(cfg["iter"]),
+        "--sigma",              str(cfg["sigma"]),
+        "--random_seed",        str(cfg["random_seed"]),
+        "--eval_every",         str(cfg["eval_every"]),
+        "--eval_episodes",      str(cfg["eval_episodes"]),
+        "--converge_patience",  str(cfg["converge_patience"]),
+        "--converge_threshold", str(cfg["converge_threshold"]),
+        "--lr",                 str(cfg["lr"]),
+        "--gamma",              str(cfg["gamma"]),
+        "--batch_size",         str(cfg["batch_size"]),
+        "--epsilon_decay",      str(cfg["epsilon_decay"]),
+        "--min_epsilon",        str(cfg["min_epsilon"]),
+        "--min_buffer",         str(cfg["min_buffer"]),
+        "--max_buffer",         str(cfg["max_buffer"]),
+        "--target_update",      str(cfg["target_update"]),
+        "--clip_eps",           str(cfg["clip_eps"]),
+        "--rollout_size",       str(cfg["rollout_size"]),
+        "--ppo_epochs",         str(cfg["ppo_epochs"]),
+        "--gae_lambda",         str(cfg["gae_lambda"]),
+        "--entropy_coef",       str(cfg["entropy_coef"]),
+        "--value_coef",         str(cfg["value_coef"]),
     ]
 
 
