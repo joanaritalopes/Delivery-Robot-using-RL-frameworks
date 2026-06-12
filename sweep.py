@@ -316,6 +316,7 @@ def parse_args():
 
 
 def main():
+    sweep_start = time.time()
     args    = parse_args()
     out_dir = args.results_dir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -379,7 +380,15 @@ def main():
 
     print("\nSweep done. Running finalize...\n")
     finalize(out_dir)
-
-
+    # Calculate and print total runtime
+    total_time = time.time() - sweep_start
+    hours = int(total_time // 3600)
+    minutes = int((total_time % 3600) // 60)
+    seconds = int(total_time % 60)
+    print(
+        f"\nTotal experiment runtime: "
+        f"{hours}h {minutes}m {seconds}s"
+)
+    
 if __name__ == "__main__":
     main()
