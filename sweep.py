@@ -58,27 +58,23 @@ DEFAULTS = {
 }
 
 SHARED_SWEEP = {
-    "lr":         [1e-4, 5e-3],
+    "lr":         [1e-4, 3e-4, 1e-3],
     "gamma":      [0.95, 0.999],
-    "sigma":      [0.0, 0.2],
-    "iter":       [200000, 1000000],
-    "eval_every": [10, 50],
+    "sigma":      [0.0, 0.1, 0.2],
+    "iter":       [200000, 500000, 1000000],
 }
 
 DQN_SWEEP = {
-    "epsilon_decay": [0.999, 0.99995],
-    "batch_size":    [32, 256],
-    "target_update": [100, 1000],
-    "max_buffer":    [10000, 200000],
+    "epsilon_decay": [0.99997, 0.99998],
+    "batch_size":    [64, 128],
+    "target_update": [200, 1000],
+    "max_buffer":    [50000, 100000],
 }
 
 PPO_SWEEP = {
-    "clip_eps":     [0.1, 0.4],
-    "rollout_size": [128, 1024],
-    "ppo_epochs":   [5, 40],
-    "gae_lambda":   [0.9, 1.0],
-    "entropy_coef": [0.0, 0.1],
-    "value_coef":   [0.25, 1.0],
+    "clip_eps":     [0.1, 0.2],
+    "rollout_size": [256, 512],
+    "gae_lambda":   [0.9, 0.95],
 }
 
 SUMMARY_FIELDS = [
