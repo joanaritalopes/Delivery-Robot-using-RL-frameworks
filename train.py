@@ -234,7 +234,7 @@ def train(agent, grid_fp: Path, total_steps: int, no_gui: bool,
                       random_seed=random_seed)
 
     init_csv(train_log, ["episode", "steps_so_far", "ep_reward",
-                         "ep_length", "success_rate", "epsilon"])
+                         "ep_length", "success", "epsilon"])
     init_csv(eval_log,  ["episode", "steps_so_far", "eval_mean_reward",
                          "eval_std_reward", "eval_success_rate",
                          "eval_mean_length"])
@@ -252,8 +252,10 @@ def train(agent, grid_fp: Path, total_steps: int, no_gui: bool,
         ep_steps = 0
         terminated = False
         episode += 1
+        
+        max_steps_per_episode = 1000
 
-        while not terminated:
+        while not terminated and ep_steps < max_steps_per_episode:
             action = agent.take_action(state)
             next_state, reward, terminated, info = env.step(action)
 

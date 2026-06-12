@@ -79,7 +79,8 @@ PPO_SWEEP = {
 
 SUMMARY_FIELDS = [
     "config_id", "agent", "grid", "swept_param", "swept_value",
-    "eval_success_rate", "eval_mean_reward",
+    "eval_success_rate", "eval_mean_reward","eval_mean_length",
+    "best_eval_steps",
 ]
 
 
@@ -147,12 +148,17 @@ def extract_best_eval(eval_csv):
                 rows.append({
                     "eval_success_rate": float(row["eval_success_rate"]),
                     "eval_mean_reward":  float(row["eval_mean_reward"]),
+                    "eval_mean_length":  float(row["eval_mean_length"]),
+                    "best_eval_steps":   int(row["steps_so_far"]),
                 })
             except (ValueError, KeyError):
                 continue
     if not rows:
         return {}
-    return max(rows, key=lambda r: (r["eval_success_rate"], r["eval_mean_reward"]))
+    return max(rows, key=lambda r: (r["eval_success_rate"],
+            r["eval_mean_reward"],
+            -r["eval_mean_length"],
+            -r["best_eval_steps"],))
 
 
 def run_config(cfg, config_id, out_dir):
@@ -212,9 +218,15 @@ def finalize(results_dir):
             try:
                 row["eval_success_rate"] = float(row["eval_success_rate"] or -1)
                 row["eval_mean_reward"]  = float(row["eval_mean_reward"] or -9999)
+                row["eval_mean_length"]  = float(row["eval_mean_length"] or 999999)
+                row["best_eval_steps"]   = float(row["best_eval_steps"] or 999999)
+
+
             except ValueError:
                 row["eval_success_rate"] = -1
                 row["eval_mean_reward"]  = -9999
+                row["eval_mean_length"]  = 999999
+                row["best_eval_steps"]   = 999999
             rows.append(row)
 
     with open(configs_path) as f:
@@ -225,7 +237,7 @@ def finalize(results_dir):
     final_summary_path = final_dir / "final_summary.csv"
 
     final_fields = ["config_id", "agent", "grid", "best", "seed",
-                    "eval_success_rate", "eval_mean_reward"]
+                    "eval_success_rate", "eval_mean_reward", "eval_mean_length", "best_eval_steps"]
     with open(final_summary_path, "w", newline="") as f:
         csv.DictWriter(f, fieldnames=final_fields).writeheader()
 
@@ -237,7 +249,8 @@ def finalize(results_dir):
 
     for (agent, grid), group_rows in sorted(groups.items()):
         top2 = sorted(group_rows,
-                      key=lambda r: (r["eval_success_rate"], r["eval_mean_reward"]),
+                      key=lambda r: (r["eval_success_rate"], r["eval_mean_reward"],-r["eval_mean_length"],
+        -r["best_eval_steps"]),
                       reverse=True)[:2]
         best_configs[(agent, grid)] = top2
 
@@ -261,6 +274,8 @@ def finalize(results_dir):
                         "seed":              seed,
                         "eval_success_rate": metrics.get("eval_success_rate", ""),
                         "eval_mean_reward":  metrics.get("eval_mean_reward", ""),
+                        "eval_mean_length":  metrics.get("eval_mean_length", ""),  
+                        "best_eval_steps":   metrics.get("best_eval_steps", "")
                     })
 
     df = pd.read_csv(final_summary_path)
@@ -356,6 +371,8 @@ def main():
                 "swept_value":       cfg["swept_value"],
                 "eval_success_rate": metrics.get("eval_success_rate", ""),
                 "eval_mean_reward":  metrics.get("eval_mean_reward", ""),
+                "eval_mean_length":  metrics.get("eval_mean_length", ""),
+                "best_eval_steps":   metrics.get("best_eval_steps", ""),
             })
 
     print("\nSweep done. Running finalize...\n")
