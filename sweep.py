@@ -15,6 +15,7 @@ Usage:
   python3 sweep.py --finalize      # run only the finalize step (re-running top-2 configs with 3 seeds and saving results)
 """
 
+import time
 import argparse
 import csv
 import json
@@ -80,7 +81,7 @@ PPO_SWEEP = {
 SUMMARY_FIELDS = [
     "config_id", "agent", "grid", "swept_param", "swept_value",
     "eval_success_rate", "eval_mean_reward","eval_mean_length",
-    "best_eval_steps",
+    "best_eval_steps", "runtime_sec",
 ]
 
 
@@ -359,9 +360,9 @@ def main():
         existing_cfgs[config_id] = cfg
         with open(configs_path, "w") as f:
             json.dump(existing_cfgs, f, indent=2)
-
+        cfg_start = time.time() # to calculate runtime for this config(start)
         metrics = run_config(cfg, config_id, out_dir)
-
+        runtime_sec = round(time.time() - cfg_start, 2) # to calculate runtime for this config(end)
         with open(summary_path, "a", newline="") as f:
             csv.DictWriter(f, fieldnames=SUMMARY_FIELDS).writerow({
                 "config_id":         config_id,
@@ -373,6 +374,7 @@ def main():
                 "eval_mean_reward":  metrics.get("eval_mean_reward", ""),
                 "eval_mean_length":  metrics.get("eval_mean_length", ""),
                 "best_eval_steps":   metrics.get("best_eval_steps", ""),
+                "runtime_sec":       runtime_sec,
             })
 
     print("\nSweep done. Running finalize...\n")
