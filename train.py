@@ -135,7 +135,7 @@ def agent_update(agent, state, next_state, reward, action, terminated):
     if isinstance(agent, DQN):
         agent.update(next_state, reward, action, terminated)
     elif isinstance(agent, PPO):
-        agent.update(state, reward, action)
+        agent.update(state, reward, action,terminated) # Added terminated to PPO update for GAE calculation
 
 
 def set_eval_mode(agent, eval_mode: bool, saved_epsilon: float = 0.0):

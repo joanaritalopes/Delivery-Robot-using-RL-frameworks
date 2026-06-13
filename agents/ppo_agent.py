@@ -87,7 +87,7 @@ class PPO(BaseAgent):
 
         return action.item()
     
-    def update(self,state,reward,action):
+    def update(self,state,reward,action,done=False):
         if self.prev_state is None:
             return
         
@@ -96,6 +96,8 @@ class PPO(BaseAgent):
         self.rewards.append(reward)
         self.log_probs.append(self.prev_log_prob)
         self.values.append(self.prev_value)
+        self.dones.append(done) # added done flag
+
 
         if len(self.states)>=self.rollout_size:
             self.learn()
@@ -104,15 +106,17 @@ class PPO(BaseAgent):
     def compute_gae(self):
         rewards=np.array(self.rewards)
         values=np.array(self.values)
+        dones = np.array(self.dones, dtype=np.float32) #added done flags to compute GAE correctly
         advantages=np.zeros_like(rewards)
 
         gae=0
         next_value=0
 
         for t in reversed(range(len(rewards))):
-            delta=(rewards[t]+self.gamma*next_value-values[t])
+            mask = 1.0 - dones[t] # if done, mask will be 0, else 1
 
-            gae=(delta+self.gamma*self.gae_lambda*gae)
+            delta = rewards[t] + self.gamma * next_value * mask - values[t] # add mask to ensure no bootstrapping after episode ends
+            gae = delta + self.gamma * self.gae_lambda * mask * gae # add mask to ensure no bootstrapping after episode ends
 
             advantages[t]=gae
             next_value=values[t]

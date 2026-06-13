@@ -35,6 +35,7 @@ GRIDS = [
 SWEEP_SEED  = 0
 FINAL_SEEDS = [0, 1, 2]
 
+
 DEFAULTS = {
     "sigma":              0.1,
     "iter":               500000,
@@ -59,10 +60,10 @@ DEFAULTS = {
 }
 
 SHARED_SWEEP = {
-    "lr":         [1e-4, 3e-4, 1e-3],
+    "lr":         [1e-4, 3e-4],
     "gamma":      [0.95, 0.999],
-    "sigma":      [0.0, 0.1, 0.2],
-    "iter":       [200000, 500000, 1000000],
+    "sigma":      [0.1, 0.2],  # removed sigma= 0.0
+    "iter":       [200000, 1000000], # removed iter=500000
 }
 
 DQN_SWEEP = {
@@ -73,10 +74,15 @@ DQN_SWEEP = {
 }
 
 PPO_SWEEP = {
-    "clip_eps":     [0.1, 0.2],
-    "rollout_size": [256, 512],
-    "gae_lambda":   [0.9, 0.95],
+    "clip_eps":     [0.1, 0.2, 0.3],
+    "rollout_size": [512, 1024, 2048],
+    "ppo_epochs":   [5, 10, 20],
+    "gae_lambda":   [0.9, 0.95, 0.98],
+    "entropy_coef": [0.01, 0.05, 0.1], # added entropy_coef to PPO sweep
 }
+
+
+
 
 SUMMARY_FIELDS = [
     "config_id", "agent", "grid", "swept_param", "swept_value",
