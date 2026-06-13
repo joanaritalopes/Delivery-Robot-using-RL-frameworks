@@ -153,7 +153,11 @@ def set_eval_mode(agent, eval_mode: bool, saved_epsilon: float = 0.0):
         else:
             agent.ep = saved_epsilon
     elif isinstance(agent, PPO):
-        agent.eval = eval_mode
+        if eval_mode:
+            agent.eval_mode()
+        else:
+            agent.train_mode()
+        
 
     return 0.0
 

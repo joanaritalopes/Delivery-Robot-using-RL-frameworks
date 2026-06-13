@@ -38,11 +38,12 @@ class PPO(BaseAgent):
         update_epochs=10,
         rollout_size=256,
         entropy_coef=0.01,
-        value_coef=0.5
+        value_coef=0.5,
+        max_grad_norm=0.5
     ):
 
         super().__init__()
-        self.device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device=torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
         self.gamma=gamma
         self.clip_eps=clip_eps
         self.update_epochs=update_epochs
@@ -50,10 +51,12 @@ class PPO(BaseAgent):
         self.entropy_coef=entropy_coef
         self.value_coef=value_coef
         self.gae_lambda=gae_lambda
+        self.max_grad_norm=max_grad_norm
 
         self.network=ActorCritic(state_dim,action_dim).to(self.device)
 
         self.optimizer=optim.Adam(self.network.parameters(),lr=lr)
+        self.training_mode=True
 
         self.reset_buffer()
 
@@ -61,6 +64,15 @@ class PPO(BaseAgent):
         self.prev_action=None
         self.prev_log_prob=None
         self.prev_value=None
+    
+
+    def train_mode(self):
+        self.training_mode=True
+        self.network.train()
+
+    def eval_mode(self):
+        self.training_mode=False
+        self.network.eval()
 
     def reset_buffer(self):
         self.states=[]
@@ -76,16 +88,22 @@ class PPO(BaseAgent):
 
         with torch.no_grad():
             logits,value=self.network(state_tensor)
-            
             dist=Categorical(logits=logits)
-            action=torch.argmax(logits,dim=-1) if hasattr(self,"eval") and self.eval else dist.sample()
+
+            if self.training_mode:
+                
+                action=dist.sample()
+            else:
+                action=torch.argmax(logits,dim=-1)
+
+            log_prob=dist.log_prob(action)
 
             self.prev_state=state
             self.prev_action=action.item()
-            self.prev_log_prob=dist.log_prob(action).item()
+            self.prev_log_prob=log_prob.item()
             self.prev_value=value.item()
 
-        return action.item()
+        return self.prev_action
     
     def update(self,state,reward,action,done=False):
         if self.prev_state is None:
@@ -96,7 +114,7 @@ class PPO(BaseAgent):
         self.rewards.append(reward)
         self.log_probs.append(self.prev_log_prob)
         self.values.append(self.prev_value)
-        self.dones.append(done) # added done flag
+        self.dones.append(done)
 
 
         if len(self.states)>=self.rollout_size:
@@ -106,17 +124,17 @@ class PPO(BaseAgent):
     def compute_gae(self):
         rewards=np.array(self.rewards)
         values=np.array(self.values)
-        dones = np.array(self.dones, dtype=np.float32) #added done flags to compute GAE correctly
+        dones = np.array(self.dones, dtype=np.float32) 
         advantages=np.zeros_like(rewards)
 
         gae=0
         next_value=0
 
         for t in reversed(range(len(rewards))):
-            mask = 1.0 - dones[t] # if done, mask will be 0, else 1
+            mask = 1.0 - dones[t] 
 
-            delta = rewards[t] + self.gamma * next_value * mask - values[t] # add mask to ensure no bootstrapping after episode ends
-            gae = delta + self.gamma * self.gae_lambda * mask * gae # add mask to ensure no bootstrapping after episode ends
+            delta = rewards[t] + self.gamma * next_value * mask - values[t]
+            gae = delta + self.gamma * self.gae_lambda * mask * gae 
 
             advantages[t]=gae
             next_value=values[t]
@@ -125,6 +143,9 @@ class PPO(BaseAgent):
         return advantages,returns
     
     def learn(self):
+
+        if len(self.states)==0:
+            return
         advantages,returns=self.compute_gae()
         
         states=torch.FloatTensor(np.array(self.states)).to(self.device)
@@ -133,7 +154,8 @@ class PPO(BaseAgent):
         advantages=torch.FloatTensor(advantages).to(self.device)
         returns=torch.FloatTensor(returns).to(self.device)
         
-        advantages=(advantages-advantages.mean())/(advantages.std()+1e-8)
+        if len(advantages)>1:
+            advantages=(advantages-advantages.mean())/(advantages.std()+1e-8)
 
         for _ in range(self.update_epochs):
             logits,values=self.network(states)
@@ -155,6 +177,7 @@ class PPO(BaseAgent):
 
             self.optimizer.zero_grad()
             loss.backward()
+            nn.utils.clip_grad_norm_(self.network.parameters(),self.max_grad_norm)
             self.optimizer.step()
 
         self.reset_buffer()
