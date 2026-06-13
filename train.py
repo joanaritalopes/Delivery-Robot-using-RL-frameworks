@@ -253,7 +253,7 @@ def train(agent, grid_fp: Path, total_steps: int, no_gui: bool,
         terminated = False
         episode += 1
         
-        max_steps_per_episode = 1000
+        max_steps_per_episode = 5000
 
         while not terminated and ep_steps < max_steps_per_episode:
             action = agent.take_action(state)
