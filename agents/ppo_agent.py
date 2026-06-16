@@ -43,7 +43,7 @@ class PPO(BaseAgent):
     ):
 
         super().__init__()
-        self.device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device=torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
         self.gamma=gamma
         self.clip_eps=clip_eps
         self.update_epochs=update_epochs
@@ -121,14 +121,14 @@ class PPO(BaseAgent):
             self.learn()
     
 
-    def compute_gae(self):
+    def compute_gae(self, next_value=0.0):
         rewards=np.array(self.rewards)
         values=np.array(self.values)
         dones = np.array(self.dones, dtype=np.float32) 
         advantages=np.zeros_like(rewards)
 
         gae=0
-        next_value=0
+        
 
         for t in reversed(range(len(rewards))):
             mask = 1.0 - dones[t] 
@@ -146,7 +146,12 @@ class PPO(BaseAgent):
 
         if len(self.states)==0:
             return
-        advantages,returns=self.compute_gae()
+        
+        with torch.no_grad():
+            last_state=torch.FloatTensor(self.states[-1]).unsqueeze(0).to(self.device)
+            _,next_value=self.network(last_state)
+            next_value=next_value.item() if not self.dones[-1] else 0.0
+        advantages,returns=self.compute_gae(next_value=next_value)
         
         states=torch.FloatTensor(np.array(self.states)).to(self.device)
         actions=torch.LongTensor(np.array(self.actions)).to(self.device)
@@ -157,28 +162,37 @@ class PPO(BaseAgent):
         if len(advantages)>1:
             advantages=(advantages-advantages.mean())/(advantages.std()+1e-8)
 
+        minibatch_size=64
         for _ in range(self.update_epochs):
-            logits,values=self.network(states)
+            indices=torch.randperm(len(states))
+            for start in range(0,len(states),minibatch_size):
+                batch_idx=indices[start:start+minibatch_size]
+                batch_states=states[batch_idx]
+                batch_actions=actions[batch_idx]
+                batch_old_log_probs=old_log_probs[batch_idx]
+                batch_advantages=advantages[batch_idx]
+                batch_returns=returns[batch_idx]
+                logits,values=self.network(batch_states)
 
-            dist=Categorical(logits=logits)
+                dist=Categorical(logits=logits)
 
-            new_log_probs=dist.log_prob(actions)
-            entropy=dist.entropy().mean()
-            
-            ratio=torch.exp(new_log_probs-old_log_probs)
-            surr1=ratio*advantages
-            surr2=torch.clamp(ratio,1-self.clip_eps,1+self.clip_eps)*advantages
+                new_log_probs=dist.log_prob(batch_actions)
+                entropy=dist.entropy().mean()
 
-            actor_loss=-torch.min(surr1,surr2).mean()
-            
-            critic_loss=nn.functional.mse_loss(values.squeeze(),returns)
+                ratio=torch.exp(new_log_probs-batch_old_log_probs)
+                surr1=ratio*batch_advantages
+                surr2=torch.clamp(ratio,1-self.clip_eps,1+self.clip_eps)*batch_advantages
 
-            loss=(actor_loss+self.value_coef*critic_loss -self.entropy_coef*entropy)
+                actor_loss=-torch.min(surr1,surr2).mean()
+                
+                critic_loss=nn.functional.mse_loss(values.squeeze(),batch_returns)
 
-            self.optimizer.zero_grad()
-            loss.backward()
-            nn.utils.clip_grad_norm_(self.network.parameters(),self.max_grad_norm)
-            self.optimizer.step()
+                loss=(actor_loss+self.value_coef*critic_loss -self.entropy_coef*entropy)
+
+                self.optimizer.zero_grad()
+                loss.backward()
+                nn.utils.clip_grad_norm_(self.network.parameters(),self.max_grad_norm)
+                self.optimizer.step()
 
         self.reset_buffer()
 
