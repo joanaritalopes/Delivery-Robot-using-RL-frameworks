@@ -157,6 +157,10 @@ def set_eval_mode(agent, eval_mode: bool, saved_epsilon: float = 0.0):
             agent.eval_mode()
         else:
             agent.train_mode()
+            agent.prev_state = None
+            agent.prev_action = None
+            agent.prev_log_prob = None  
+            agent.prev_value = None
         
 
     return 0.0
