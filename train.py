@@ -2,9 +2,6 @@
 Train RL Agent.
 
 Usage example:
-    # train on 1 grid
-    python3 train.py grid_configs/example_grid.npy --agent dqn --no_gui --iter 100000
-
     # train DQN on one grid with default hyperparameters
     python3 train.py grid_configs/half_aisles.npy --agent dqn --no_gui --iter 500000
  

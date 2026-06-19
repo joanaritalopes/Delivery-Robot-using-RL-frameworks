@@ -187,3 +187,45 @@ sweep_results/
 
 ## Final Best models CLI comand with best hyperparameters for train.py
 
+# train DQN on all grids
+python3 train.py grid_configs/*.npy 
+  --agent dqn \
+  --no_gui \
+  --iter 500000 \
+  --sigma 0.1 \
+  --random_seed 0 \
+  --lr 0.001 \
+  --gamma 0.99 \
+  --batch_size 64 \
+  --epsilon_decay 0.9995 \
+  --min_epsilon 0.01 \
+  --min_buffer 1000 \
+  --max_buffer 50000 \
+  --target_update 200 \
+  --eval_episodes 20 \
+  --eval_every 10 \
+  --converge_patience 5 \
+  --converge_threshold 0.95
+
+# train PPO on all grids
+python3 train.py grid_configs/half_aisles.npy grid_configs/fishbone.npy grid_configs/flying_v.npy \
+  --agent ppo \
+  --no_gui \
+  --iter 500000 \
+  --sigma 0.1 \
+  --random_seed 0 \
+  --lr 0.001 \
+  --gamma 0.99 \
+  --clip_eps 0.2 \
+  --rollout_size 256 \
+  --ppo_epochs 10 \
+  --gae_lambda 0.95 \
+  --entropy_coef 0.01 \
+  --value_coef 0.5 \
+  --eval_episodes 20 \
+  --eval_every 10 \
+  --converge_patience 5 \
+  --converge_threshold 0.95
+
+# train agent on all grids by specifying them
+python3 train.py grid_configs/half_aisles.npy grid_configs/fishbone.npy grid_configs/flying_v.npy --agent dqn --no_gui --iter 500000 ...
