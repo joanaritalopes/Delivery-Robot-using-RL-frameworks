@@ -139,7 +139,7 @@ Pre-built grids are in `grid_configs/`:
 
 ## Hyperparameter Sweep
 
-Scripts are provided for one-at-a-time (OAT) hyperparameter search across DQN and PPO.
+Script for one-at-a-time (OAT) hyperparameter search across DQN and PPO.
 
 ### `sweep.py` — Standard sweep and the one we choose to use at the end given that is more efficient
 
@@ -170,35 +170,6 @@ python3 sweep.py --results_dir my_sweep_output
 | `--results_dir` | `sweep_results` | Output directory for sweep results |
 | `--resume` | off | Skip already-completed configs |
 | `--finalize` | off | Skip sweep; only re-run top-2 configs with multiple seeds |
-
-### `sweep_complex.py` — Extended sweep
-
-Larger grid of hyperparameter values with more detailed logging.
-
-```bash
-# Full extended sweep
-python3 sweep_complex.py
-
-# DQN only, dry run (no actual training)
-python3 sweep_complex.py --agent dqn --dry_run
-
-# Resume from checkpoint
-python3 sweep_complex.py --resume
-
-# Finalize only
-python3 sweep_complex.py --finalize
-
-# Dry run of finalize
-python3 sweep_complex.py --finalize --dry_run
-```
-
-| Argument | Default | Description |
-|---|---|---|
-| `--agent` | `both` | Agent(s) to sweep: `dqn`, `ppo`, or `both` |
-| `--results_dir` | `sweep_results` | Output directory |
-| `--resume` | off | Skip already-completed configs |
-| `--finalize` | off | Re-run top-2 configs with seeds 0, 1, 2 |
-| `--dry_run` | off | Print commands without running training |
 
 ### Sweep output
 
