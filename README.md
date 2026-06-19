@@ -185,5 +185,5 @@ sweep_results/
 
 ---
 
-## Final Best models CLI comand with best hyperparameters
+## Final Best models CLI comand with best hyperparameters for train.py
 
