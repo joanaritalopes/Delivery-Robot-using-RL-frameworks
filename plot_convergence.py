@@ -135,7 +135,7 @@ def plot_metric(curves, metric, ylabel, output_path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--results_dir", default="final_exp2")
+    parser.add_argument("--results_dir", default="final_exp")
     parser.add_argument("--output_dir", default="report_outputs/convergence")
     args = parser.parse_args()
 
