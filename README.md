@@ -54,7 +54,7 @@ python3 train.py grid_configs/flying_v.npy --agent dqn --no_gui --iter 500000
 python3 train.py grid_configs/fishbone.npy --agent ppo --no_gui --iter 500000
 
 # Train DQN on multiple grids back-to-back
-python3 train.py grid_configs/fishbone.npy grid_configs/flying_v.npy --agent dqn --no_gui --iter 500000
+python3 train.py grid_configs/half_aisles.npy grid_configs/flying_v.npy --agent dqn --no_gui --iter 500000
 ```
 
 ### All CLI arguments
