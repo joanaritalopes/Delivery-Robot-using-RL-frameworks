@@ -20,7 +20,6 @@ pip install -r requirements.txt
 .
 ├── train.py              # Main training script
 ├── sweep.py              # Hyperparameter sweep (OAT)
-├── sweep_complex.py      # Extended hyperparameter sweep
 ├── agents/
 │   ├── dqn_agent.py      # DQN implementation
 │   ├── ppo_agent.py      # PPO implementation
