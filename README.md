@@ -228,6 +228,6 @@ python3 train.py grid_configs/*.npy \
   --converge_patience 5 \
   --converge_threshold 0.95
 
-# if want to train agent on all grids or just one then just specify them like as follow:
+# if you want to train agent on all grids or just one then just specify them like as follow:
 python3 train.py grid_configs/half_aisles.npy grid_configs/fishbone.npy grid_configs/flying_v.npy --agent dqn --no_gui ...
 ```
