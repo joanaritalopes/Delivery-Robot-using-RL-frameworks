@@ -8,3 +8,4 @@ colorcet >= 3.0
 pyparsing >= 3.0
 pandas >= 2.2
 torch >= 2.0
+matplotlib >= 3.7

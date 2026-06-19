@@ -7,6 +7,8 @@ A reinforcement learning project that trains a simplified delivery robot to navi
 ## Setup
 
 **Requirements:** Python 3.10+, PyTorch
+**Compatibility note:**  
+The project was developed and tested using Python 3.12. Python 3.14 may cause compatibility issues with certain matplotlib versions.
 
 ```bash
 pip install -r requirements.txt
@@ -20,6 +22,8 @@ pip install -r requirements.txt
 .
 ├── train.py              # Main training script
 ├── sweep.py              # Hyperparameter sweep (OAT)
+├── analysis_report.py    # Aggregates results and creates report visualizations
+├── plot_convergence.py   # Creates reward, success-rate, and episode-length convergence plots
 ├── agents/
 │   ├── dqn_agent.py      # DQN implementation
 │   ├── ppo_agent.py      # PPO implementation
@@ -115,6 +119,34 @@ Training logs are saved automatically to `results/` with timestamps:
 - `results/<timestamp>_<agent>_<grid>_eval.csv` — periodic evaluation metrics
 
 ---
+
+### Reproducing Results
+
+After training and hyperparameter sweeps are completed, the plotting and analysis scripts can be used to reproduce the figures and tables reported in the paper.
+
+#### Convergence plots
+
+`plot_convergence.py` creates convergence plots from evaluation CSV files (*_eval.csv). These plots show evaluation reward, success rate, and episode length during training.
+
+**Note:**  
+
+Before running this script, the final experiment configurations must be trained and their evaluation logs must be available. The script reads the saved training outputs produced during the final experiment phase.
+
+```bash
+python plot_convergence.py \
+  --results_dir final_exp \
+  --output_dir report_outputs/convergence
+```
+#### Main report analysis
+
+`analysis_report.py` reads the sweep and final run outputs and generates tables and plots used in the report, including best sweep configurations, multi-seed mean/std results, success-rate heatmap, and hyperparameter sensitivity plots.
+**Note:**  
+
+`analysis.py` requires completed sweep results and multi-seed evaluation results. The script summarizes these outputs into the tables and figures.
+```bash
+python3 analysis_report.py \
+  --results_dir final_exp \
+  --output_dir report_outputs```
 
 ## Available Grid Configs
 
