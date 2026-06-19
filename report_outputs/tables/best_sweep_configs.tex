@@ -1,0 +1,16 @@
+\begin{table}
+\caption{Best hyperparameter configuration per agent and grid.}
+\label{tab:best_sweep_configs}
+\begin{tabular}{lllllrrrrr}
+\toprule
+config_id & agent & grid & swept_param & swept_value & eval_success_rate & eval_mean_reward & eval_mean_length & best_eval_steps & runtime_sec \\
+\midrule
+dqn_fishbone_epsilon_decay_0p99997 & dqn & fishbone & epsilon_decay & 0.99997 & 1.000000 & -35.000000 & 38.800000 & 24757 & 19.470000 \\
+dqn_flying_v_epsilon_decay_0p99997 & dqn & flying_v & epsilon_decay & 0.99997 & 1.000000 & -33.900000 & 38.900000 & 173056 & 72.440000 \\
+dqn_half_aisles_gamma_0p95 & dqn & half_aisles & gamma & 0.95 & 1.000000 & -43.500000 & 45.300000 & 264843 & 118.570000 \\
+ppo_fishbone_rollout_size_2048 & ppo & fishbone & rollout_size & 2048 & 0.800000 & -11734.400000 & 2478.800000 & 90662 & 105.770000 \\
+ppo_flying_v_lr_0p0001 & ppo & flying_v & lr & 0.0001 & 0.500000 & -13265.800000 & 3542.500000 & 294062 & 91.820000 \\
+ppo_half_aisles_sigma_0p2 & ppo & half_aisles & sigma & 0.2 & 0.500000 & -18076.600000 & 4065.300000 & 88009 & 85.310000 \\
+\bottomrule
+\end{tabular}
+\end{table}

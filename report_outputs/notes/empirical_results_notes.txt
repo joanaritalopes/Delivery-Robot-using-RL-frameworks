@@ -1,0 +1,33 @@
+EMPIRICAL RESULTS SUMMARY
+=========================
+
+1. Best sweep configurations
+- DQN on fishbone: dqn_fishbone_epsilon_decay_0p99997 | success=1.000, reward=-35.00, length=38.80, best_steps=24757
+- DQN on flying_v: dqn_flying_v_epsilon_decay_0p99997 | success=1.000, reward=-33.90, length=38.90, best_steps=173056
+- DQN on half_aisles: dqn_half_aisles_gamma_0p95 | success=1.000, reward=-43.50, length=45.30, best_steps=264843
+- PPO on fishbone: ppo_fishbone_rollout_size_2048 | success=0.800, reward=-11734.40, length=2478.80, best_steps=90662
+- PPO on flying_v: ppo_flying_v_lr_0p0001 | success=0.500, reward=-13265.80, length=3542.50, best_steps=294062
+- PPO on half_aisles: ppo_half_aisles_sigma_0p2 | success=0.500, reward=-18076.60, length=4065.30, best_steps=88009
+
+2. Final multi-seed results
+- DQN on fishbone: success=1.000 ± 0.000, reward=-36.87 ± 3.24, length=39.20 ± 0.87, steps=53178 ± 40911
+- DQN on flying_v: success=0.667 ± 0.516, reward=-1812.65 ± 2671.44, length=1716.05 ± 2544.22, steps=377987 ± 283243
+- DQN on half_aisles: success=0.700 ± 0.469, reward=-1953.32 ± 2760.45, length=1621.02 ± 2388.62, steps=421384 ± 88256
+- PPO on fishbone: success=0.000 ± 0.000, reward=-23596.13 ± 67.96, length=5000.00 ± 0.00, steps=89602 ± 24303
+- PPO on flying_v: success=0.050 ± 0.055, reward=-22479.97 ± 1658.99, length=4873.58 ± 142.28, steps=196836 ± 152799
+- PPO on half_aisles: success=0.150 ± 0.226, reward=-18995.50 ± 5720.89, length=4663.95 ± 611.00, steps=124089 ± 86441
+
+3. Most influential hyperparameters by success-rate range
+- DQN on fishbone: gamma (success impact=1.000)
+- DQN on flying_v: gamma (success impact=1.000)
+- DQN on half_aisles: gamma (success impact=1.000)
+- PPO on fishbone: rollout_size (success impact=0.800)
+- PPO on flying_v: lr (success impact=0.500)
+- PPO on half_aisles: lr (success impact=0.300)
+
+4. Interpretation guide
+- Higher success rate is better.
+- Higher mean reward is better because rewards are mostly negative penalties.
+- Lower episode length indicates more efficient navigation.
+- Lower best evaluation steps indicates faster convergence.
+- Episode length 5000 indicates timeout and unsuccessful termination.

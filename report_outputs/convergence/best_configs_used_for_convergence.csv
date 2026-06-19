@@ -1,0 +1,7 @@
+config_id,agent,grid,swept_param,swept_value,eval_success_rate,eval_mean_reward,eval_mean_length,best_eval_steps,runtime_sec
+dqn_fishbone_epsilon_decay_0p99997,dqn,fishbone,epsilon_decay,0.99997,1.0,-35.0,38.8,24757,19.47
+dqn_flying_v_epsilon_decay_0p99997,dqn,flying_v,epsilon_decay,0.99997,1.0,-33.9,38.9,173056,72.44
+dqn_half_aisles_gamma_0p95,dqn,half_aisles,gamma,0.95,1.0,-43.5,45.3,264843,118.57
+ppo_fishbone_rollout_size_2048,ppo,fishbone,rollout_size,2048,0.8,-11734.4,2478.8,90662,105.77
+ppo_flying_v_lr_0p0001,ppo,flying_v,lr,0.0001,0.5,-13265.8,3542.5,294062,91.82
+ppo_half_aisles_sigma_0p2,ppo,half_aisles,sigma,0.2,0.5,-18076.6,4065.3,88009,85.31
