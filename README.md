@@ -209,7 +209,7 @@ python3 train.py grid_configs/*.npy
   --converge_threshold 0.95
 
 # train PPO on all grids
-python3 train.py grid_configs/half_aisles.npy grid_configs/fishbone.npy grid_configs/flying_v.npy \
+python3 train.py grid_configs/*.npy \
   --agent ppo \
   --no_gui \
   --iter 500000 \
@@ -228,6 +228,6 @@ python3 train.py grid_configs/half_aisles.npy grid_configs/fishbone.npy grid_con
   --converge_patience 5 \
   --converge_threshold 0.95
 
-# train agent on all grids by specifying them
-python3 train.py grid_configs/half_aisles.npy grid_configs/fishbone.npy grid_configs/flying_v.npy --agent dqn --no_gui --iter 500000 ...
+# if want to train agent on all grids or just one then just specify them like as follow:
+python3 train.py grid_configs/half_aisles.npy grid_configs/fishbone.npy grid_configs/flying_v.npy --agent dqn --no_gui ...
 ```
