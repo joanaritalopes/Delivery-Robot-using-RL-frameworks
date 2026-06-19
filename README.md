@@ -102,10 +102,10 @@ python3 train.py grid_configs/half_aisles.npy grid_configs/flying_v.npy --agent 
 
 ```bash
 # DQN with custom hyperparameters
-python3 train.py grid_configs/warehouse_small.npy --agent dqn --no_gui --iter 500000 --lr 0.0001 --gamma 0.99 --batch_size 128 --epsilon_decay 0.9999 --target_update 500
+python3 train.py grid_configs/fishbone.npy --agent dqn --no_gui --iter 500000 --lr 0.0001 --gamma 0.99 --batch_size 128 --epsilon_decay 0.9999 --target_update 500
 
 # PPO with custom hyperparameters
-python3 train.py grid_configs/warehouse_small.npy --agent ppo --no_gui --iter 500000 --lr 0.0003 --gamma 0.99 --clip_eps 0.2 --rollout_size 512 --ppo_epochs 10
+python3 train.py grid_configs/half_aisles.npy --agent ppo --no_gui --iter 500000 --lr 0.0003 --gamma 0.99 --clip_eps 0.2 --rollout_size 512 --ppo_epochs 10
 ```
 
 ### Output
