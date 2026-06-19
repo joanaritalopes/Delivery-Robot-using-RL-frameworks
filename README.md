@@ -187,6 +187,7 @@ sweep_results/
 
 ## Final Best models CLI comand with best hyperparameters for train.py
 
+```
 # train DQN on all grids
 python3 train.py grid_configs/*.npy 
   --agent dqn \
@@ -229,3 +230,4 @@ python3 train.py grid_configs/half_aisles.npy grid_configs/fishbone.npy grid_con
 
 # train agent on all grids by specifying them
 python3 train.py grid_configs/half_aisles.npy grid_configs/fishbone.npy grid_configs/flying_v.npy --agent dqn --no_gui --iter 500000 ...
+```
