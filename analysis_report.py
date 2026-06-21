@@ -392,21 +392,29 @@ def parse_agent_grid_from_filename(path):
 
     if name.endswith("_eval"):
         name = name[:-5]
+    elif name.endswith("_train"):
+        name = name[:-6]
 
-    parts = name.split("_")
+    parts = [p for p in name.split("_") if p != ""]
 
-    if parts[0] == "dqn":
-        agent = "dqn"
-        rest = parts[1:]
-    elif parts[0] == "ppo":
-        agent = "ppo"
-        rest = parts[1:]
-    elif parts[0] == "dueling" and len(parts) > 1 and parts[1] == "dqn":
-        agent = "dueling_dqn"
-        rest = parts[2:]
-    else:
-        agent = parts[0]
-        rest = parts[1:]
+    known_agents = {
+        "dqn": ("dqn", 1),
+        "ppo": ("ppo", 1),
+    }
+
+    agent = "unknown"
+    rest = parts
+
+    for i, part in enumerate(parts):
+        if part == "dueling" and i + 1 < len(parts) and parts[i + 1] == "dqn":
+            agent = "dueling_dqn"
+            rest = parts[i + 2:]
+            break
+        if part in known_agents:
+            agent_name, skip = known_agents[part]
+            agent = agent_name
+            rest = parts[i + skip:]
+            break
 
     known_grids = ["fishbone", "flying_v", "half_aisles"]
 
@@ -420,113 +428,130 @@ def parse_agent_grid_from_filename(path):
     return agent, grid
 
 
-def plot_convergence_curves(results_dir, plots_dir):
+def plot_convergence_curves(results_dir, plots_dir, smoothing=10):
     """
-    Reads all *_eval.csv files and creates:
-    1. success-rate convergence curves per grid
-    2. mean-reward convergence curves per grid
-    3. episode-length convergence curves per grid
+    Plot convergence version 2
     """
+    # Hard code for now
+    results_dir = Path("results")
 
     eval_files = list(results_dir.glob("*_eval.csv"))
+    train_files = list(results_dir.glob("*_train.csv"))
 
-    if not eval_files:
-        print("No *_eval.csv files found for convergence plots.")
+    if not eval_files and not train_files:
+        print("No *_eval.csv or *_train.csv files found for convergence plots.")
         return
 
-    all_rows = []
+    agent_colors = {"dqn": "#1f77b4", "ppo": "#ff7f0e"}
 
-    for path in eval_files:
-        df = pd.read_csv(path)
-        step_col = find_step_column(df)
+    def load_files(file_list, kind):
+        rows = []
+        for path in file_list:
+            df = pd.read_csv(path)
+            agent, grid = parse_agent_grid_from_filename(path)
+            df = df.copy()
+            df["agent"] = df.get("agent", agent)
+            df["grid"] = df.get("grid", grid)
+            df["source_file"] = path.name
+            df["kind"] = kind
+            rows.append(df)
+        return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
 
-        if step_col is None:
-            print(f"Skipping {path.name}: no step column found.")
-            continue
+    eval_df = load_files(eval_files, "eval")
+    train_df = load_files(train_files, "train")
 
-        agent, grid = parse_agent_grid_from_filename(path)
+    if not eval_df.empty:
+        eval_df.to_csv(plots_dir.parent / "tables" / "all_eval_curves.csv", index=False)
+    if not train_df.empty:
+        train_df.to_csv(plots_dir.parent / "tables" / "all_train_curves.csv", index=False)
 
-        df = df.copy()
-        df["agent"] = df.get("agent", agent)
-        df["grid"] = df.get("grid", grid)
-        df["step_for_plot"] = df[step_col]
-        df["source_file"] = path.name
+    grids = set(eval_df["grid"].unique() if not eval_df.empty else []) | \
+            set(train_df["grid"].unique() if not train_df.empty else [])
 
-        all_rows.append(df)
+    metrics = [
+        ("eval_success_rate", "success", "Success rate", "convergence_success", (-0.05, 1.05)),
+        ("eval_mean_reward", "ep_reward", "Mean reward", "convergence_reward", None),
+        ("eval_mean_length", "ep_length", "Mean episode length", "convergence_length", None),
+    ]
 
-    if not all_rows:
-        print("No usable eval files for convergence plots.")
-        return
-
-    eval_df = pd.concat(all_rows, ignore_index=True)
-    eval_df.to_csv(plots_dir.parent / "tables" / "all_eval_curves.csv", index=False)
-
-    for grid, group in eval_df.groupby("grid"):
+    for grid in grids:
         if grid == "unknown":
             continue
 
-        if "eval_success_rate" in group.columns:
-            plt.figure(figsize=(7.8, 4.2))
-            for agent, g in group.groupby("agent"):
-                g = g.sort_values("step_for_plot")
-                plt.plot(
-                    g["step_for_plot"],
-                    g["eval_success_rate"],
-                    marker="o",
-                    markersize=3,
-                    label=agent.upper(),
-                )
+        eval_g = eval_df[eval_df["grid"] == grid] if not eval_df.empty else pd.DataFrame()
+        train_g = train_df[train_df["grid"] == grid] if not train_df.empty else pd.DataFrame()
 
-            plt.title(f"Training convergence on {grid}")
-            plt.xlabel("Training steps")
-            plt.ylabel("Evaluation success rate")
-            plt.ylim(-0.05, 1.05)
+        for eval_col, train_col, ylabel, fname, ylim in metrics:
+
+            has_eval = not eval_g.empty and eval_col in eval_g.columns
+            has_train = not train_g.empty and train_col in train_g.columns
+
+            if not has_eval and not has_train:
+                continue
+
+            plt.figure(figsize=(8, 4))
+
+            agents = set(eval_g["agent"].unique() if has_eval else []) | \
+                     set(train_g["agent"].unique() if has_train else [])
+
+            for agent in agents:
+                color = agent_colors.get(agent, None)
+
+                if has_train:
+                    t = (
+                        train_g[train_g["agent"] == agent]
+                        .groupby("episode")[train_col]
+                        .mean()
+                        .reset_index()
+                        .sort_values("episode")
+                    )
+                    if not t.empty:
+                        t[train_col] = t[train_col].rolling(smoothing, min_periods=1).mean()
+                        plt.plot(
+                            t["episode"], t[train_col],
+                            linestyle="-", linewidth=1, alpha=0.5,
+                            color=color, label=f"{agent.upper()} (train)"
+                        )
+
+                if has_eval:
+                    cols_to_agg = [eval_col]
+                    if eval_col == "eval_mean_reward" and "eval_std_reward" in eval_g.columns:
+                        cols_to_agg.append("eval_std_reward")
+
+                    e = (
+                        eval_g[eval_g["agent"] == agent]
+                        .groupby("episode")[cols_to_agg]
+                        .mean()
+                        .reset_index()
+                        .sort_values("episode")
+                    )
+                    if not e.empty:
+                        e[eval_col] = e[eval_col].rolling(smoothing, min_periods=1).mean()
+
+                        if "eval_std_reward" in e.columns:
+                            e["eval_std_reward"] = e["eval_std_reward"].rolling(smoothing, min_periods=1).mean()
+                            plt.fill_between(
+                                e["episode"],
+                                e[eval_col] - e["eval_std_reward"],
+                                e[eval_col] + e["eval_std_reward"],
+                                color=color, alpha=0.15
+                            )
+
+                        plt.plot(
+                            e["episode"], e[eval_col],
+                            linestyle="-", linewidth=1,
+                            color=color, label=f"{agent.upper()} (eval)"
+                        )
+
+            plt.title(f"{ylabel} per episode on {grid}")
+            plt.xlabel("Episode")
+            plt.ylabel(ylabel)
+            if ylim is not None:
+                plt.ylim(*ylim)
             plt.grid(alpha=0.3)
-            plt.legend()
+            plt.legend(fontsize=8)
             plt.tight_layout()
-            plt.savefig(plots_dir / f"convergence_success_{grid}.png", dpi=250)
-            plt.close()
-
-        if "eval_mean_reward" in group.columns:
-            plt.figure(figsize=(7.8, 4.2))
-            for agent, g in group.groupby("agent"):
-                g = g.sort_values("step_for_plot")
-                plt.plot(
-                    g["step_for_plot"],
-                    g["eval_mean_reward"],
-                    marker="o",
-                    markersize=3,
-                    label=agent.upper(),
-                )
-
-            plt.title(f"Reward progression on {grid}")
-            plt.xlabel("Training steps")
-            plt.ylabel("Evaluation mean reward")
-            plt.grid(alpha=0.3)
-            plt.legend()
-            plt.tight_layout()
-            plt.savefig(plots_dir / f"convergence_reward_{grid}.png", dpi=250)
-            plt.close()
-
-        if "eval_mean_length" in group.columns:
-            plt.figure(figsize=(7.8, 4.2))
-            for agent, g in group.groupby("agent"):
-                g = g.sort_values("step_for_plot")
-                plt.plot(
-                    g["step_for_plot"],
-                    g["eval_mean_length"],
-                    marker="o",
-                    markersize=3,
-                    label=agent.upper(),
-                )
-
-            plt.title(f"Episode length progression on {grid}")
-            plt.xlabel("Training steps")
-            plt.ylabel("Evaluation mean episode length")
-            plt.grid(alpha=0.3)
-            plt.legend()
-            plt.tight_layout()
-            plt.savefig(plots_dir / f"convergence_length_{grid}.png", dpi=250)
+            plt.savefig(plots_dir / f"{fname}_{grid}.png", dpi=250)
             plt.close()
 
 
