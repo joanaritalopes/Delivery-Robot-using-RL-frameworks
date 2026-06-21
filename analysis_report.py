@@ -429,8 +429,6 @@ def parse_agent_grid_from_filename(path):
 
 
 def plot_convergence_curves(results_dir, plots_dir, smoothing=10):
-    results_dir = Path("results")
-
     eval_files = list(results_dir.glob("*_eval.csv"))
     train_files = list(results_dir.glob("*_train.csv"))
 
