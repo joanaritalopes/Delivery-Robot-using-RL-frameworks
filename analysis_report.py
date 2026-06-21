@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def make_dirs(output_dir):
@@ -65,9 +66,9 @@ def final_seed_summary(final_df):
     )
 
 
-def bar_plot(df, x, y, title, ylabel, output_path, yerr=None, ylim=None):
+def bar_plot(df, x, y, title, ylabel, output_path, yerr=None, ylim=None, colors=None):
     plt.figure(figsize=(9, 4.5))
-    plt.bar(df[x], df[y], yerr=yerr, capsize=4 if yerr is not None else 0)
+    plt.bar(df[x], df[y], yerr=yerr, capsize=4 if yerr is not None else 0, color=colors)
     plt.title(title)
     plt.ylabel(ylabel)
     if ylim is not None:
@@ -79,10 +80,23 @@ def bar_plot(df, x, y, title, ylabel, output_path, yerr=None, ylim=None):
     plt.close()
 
 
-def grouped_bar(summary, metric, std_metric, title, ylabel, output_path, ylim=None):
+def grouped_bar(summary, metric, std_metric, title, ylabel, output_path, ylim=None, bounded=False):
     df = add_label(summary)
-    yerr = df[std_metric].values if std_metric in df.columns else None
-    bar_plot(df, "label", metric, title, ylabel, output_path, yerr=yerr, ylim=ylim)
+    df = df.sort_values(["grid", "agent"]).reset_index(drop=True)
+
+    colors = df["agent"].map({"dqn": "#1f77b4", "ppo": "#ff7f0e"}).values
+
+    if std_metric in df.columns:
+        if bounded:
+            lower = np.minimum(df[std_metric].values, df[metric].values)
+            upper = np.minimum(df[std_metric].values, 1 - df[metric].values)
+            yerr = np.vstack([lower, upper])
+        else:
+            yerr = df[std_metric].values
+    else:
+        yerr = None
+
+    bar_plot(df, "label", metric, title, ylabel, output_path, yerr=yerr, ylim=ylim, colors=colors)
 
 
 def save_latex_table(df, path, caption, label):
@@ -99,6 +113,7 @@ def plot_final_results(final_summary, plots_dir):
         "Success rate",
         plots_dir / "final_success_rate_mean_std.png",
         ylim=(0, 1.05),
+        bounded=True,
     )
 
     grouped_bar(
@@ -172,31 +187,42 @@ def plot_combined_sensitivity_by_agent(sweep_df, plots_dir):
 
     for agent in sweep_df["agent"].unique():
 
-        plt.figure(figsize=(12, 5))
+        agent_df = sweep_df[sweep_df["agent"] == agent].copy()
+        agent_df["param_label"] = (
+                agent_df["swept_param"].astype(str)
+                + "="
+                + agent_df["swept_value"].astype(str)
+        )
 
-        agent_df = sweep_df[sweep_df["agent"] == agent]
+        param_labels = agent_df["param_label"].drop_duplicates().tolist()
+        grids = agent_df["grid"].unique()
 
-        for grid in agent_df["grid"].unique():
+        n_groups = len(param_labels)
+        n_bars = len(grids)
+        bar_width = 0.5 / n_bars
+        x = np.arange(n_groups)
+
+        plt.figure(figsize=(max(12, n_groups * 0.6), 5))
+
+        for i, grid in enumerate(grids):
 
             grid_df = agent_df[agent_df["grid"] == grid].copy()
+            grid_df = grid_df.set_index("param_label").reindex(param_labels)
 
-            grid_df["param_label"] = (
-                grid_df["swept_param"].astype(str)
-                + "="
-                + grid_df["swept_value"].astype(str)
-            )
+            # So you can actually see the 0 values
+            plot_values  = grid_df["eval_success_rate"].clip(lower=0.01)
 
-            plt.plot(
-                range(len(grid_df)),
-                grid_df["eval_success_rate"],
-                marker="o",
-                linewidth=2,
+            offset = (i - (n_bars - 1) / 2) * bar_width
+            plt.bar(
+                x + offset,
+                plot_values,
+                width=bar_width,
                 label=grid.replace("_", "-")
             )
 
         plt.xticks(
-            range(len(grid_df)),
-            grid_df["param_label"],
+            x,
+            param_labels,
             rotation=45,
             ha="right"
         )
@@ -208,7 +234,7 @@ def plot_combined_sensitivity_by_agent(sweep_df, plots_dir):
         )
 
         plt.ylim(0, 1.05)
-        plt.grid(alpha=0.3)
+        plt.grid(alpha=0.3, axis="y")
         plt.legend()
         plt.tight_layout()
 
