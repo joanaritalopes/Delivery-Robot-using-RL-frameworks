@@ -264,10 +264,10 @@ python3 train.py grid_configs/*.npy \
 python3 train.py grid_configs/half_aisles.npy grid_configs/fishbone.npy grid_configs/flying_v.npy --agent dqn --no_gui ...
 ```
 
-## Reproducing Best models
+## Reproducing Best models in train.py
 
 Below we list the best models found per agent and warehouse layout.
-All other hyperparameters are left at their `train.py` defaults while just specifying the one that gave the best model. 
+All other hyperparameters are left at their defaults while just specifying the one that gave the best model. 
 
 ```
 # DQN | Fishbone | epsilon_decay = 0.99997
