@@ -270,21 +270,21 @@ Below we list the best models found per agent and warehouse layout.
 All other hyperparameters are left at their `train.py` defaults while just specifying the one that gave the best model. 
 
 ```
-# DQN | Fishbone — epsilon_decay = 0.99997
+# DQN | Fishbone | epsilon_decay = 0.99997
 python3 train.py grid_configs/fishbone.npy --agent dqn --no_gui --epsilon_decay 0.99997
 
-# DQN | Flying-V — epsilon_decay = 0.99997
+# DQN | Flying-V | epsilon_decay = 0.99997
 python3 train.py grid_configs/flying_v.npy --agent dqn --no_gui --epsilon_decay 0.99997
 
-# DQN | Half-Aisles — gamma = 0.95
+# DQN | Half-Aisles | gamma = 0.95
 python3 train.py grid_configs/half_aisles.npy --agent dqn --no_gui --gamma 0.95
 
-# PPO | Fishbone — rollout_size = 2048
+# PPO | Fishbone | rollout_size = 2048
 python3 train.py grid_configs/fishbone.npy --agent ppo --no_gui --rollout_size 2048
 
-# PPO | Flying-V — lr = 0.0001
+# PPO | Flying-V | lr = 0.0001
 python3 train.py grid_configs/flying_v.npy --agent ppo --no_gui --lr 0.0001
 
-# PPO | Half-Aisles — sigma = 0.20
+# PPO | Half-Aisles | sigma = 0.20
 python3 train.py grid_configs/half_aisles.npy --agent ppo --no_gui --sigma 0.20
 ```
