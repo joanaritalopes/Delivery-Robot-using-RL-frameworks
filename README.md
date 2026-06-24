@@ -217,7 +217,7 @@ sweep_results/
 
 ---
 
-## Final Best models CLI comand with best hyperparameters for train.py
+## Example to run Best models CLI comand with hyperparameters for train.py
 
 ```
 # train DQN on all grids
