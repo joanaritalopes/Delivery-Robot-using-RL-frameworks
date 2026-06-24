@@ -269,7 +269,7 @@ python3 train.py grid_configs/half_aisles.npy grid_configs/fishbone.npy grid_con
 Below we list the best models found per agent and warehouse layout.
 All other hyperparameters are left at their `train.py` defaults while just specifying the one that gave the best model. 
 
-\`\`\`bash
+```
 # DQN | Fishbone — epsilon_decay = 0.99997
 python3 train.py grid_configs/fishbone.npy --agent dqn --no_gui --epsilon_decay 0.99997
 
@@ -287,4 +287,4 @@ python3 train.py grid_configs/flying_v.npy --agent ppo --no_gui --lr 0.0001
 
 # PPO | Half-Aisles — sigma = 0.20
 python3 train.py grid_configs/half_aisles.npy --agent ppo --no_gui --sigma 0.20
-\`\`\`
+```
